@@ -1,0 +1,338 @@
+{
+ "rows": [
+  {
+   "subj": "算数・数学",
+   "grade": "小1",
+   "units": 12,
+   "steps": 50,
+   "perPass": 466,
+   "uniq": 5353
+  },
+  {
+   "subj": "算数・数学",
+   "grade": "小2",
+   "units": 12,
+   "steps": 50,
+   "perPass": 463,
+   "uniq": 9236
+  },
+  {
+   "subj": "算数・数学",
+   "grade": "小3",
+   "units": 15,
+   "steps": 52,
+   "perPass": 426,
+   "uniq": 9951
+  },
+  {
+   "subj": "算数・数学",
+   "grade": "小4",
+   "units": 15,
+   "steps": 57,
+   "perPass": 423,
+   "uniq": 9203
+  },
+  {
+   "subj": "算数・数学",
+   "grade": "小5",
+   "units": 18,
+   "steps": 64,
+   "perPass": 484,
+   "uniq": 11055
+  },
+  {
+   "subj": "算数・数学",
+   "grade": "小6",
+   "units": 12,
+   "steps": 47,
+   "perPass": 330,
+   "uniq": 5841
+  },
+  {
+   "subj": "算数・数学",
+   "grade": "中1",
+   "units": 7,
+   "steps": 35,
+   "perPass": 268,
+   "uniq": 6921
+  },
+  {
+   "subj": "算数・数学",
+   "grade": "中2",
+   "units": 7,
+   "steps": 26,
+   "perPass": 190,
+   "uniq": 4493
+  },
+  {
+   "subj": "算数・数学",
+   "grade": "中3",
+   "units": 9,
+   "steps": 34,
+   "perPass": 250,
+   "uniq": 3254
+  },
+  {
+   "subj": "生活",
+   "grade": "小1",
+   "units": 5,
+   "steps": 19,
+   "perPass": 138,
+   "uniq": 193
+  },
+  {
+   "subj": "生活",
+   "grade": "小2",
+   "units": 5,
+   "steps": 16,
+   "perPass": 113,
+   "uniq": 160
+  },
+  {
+   "subj": "理科",
+   "grade": "小3",
+   "units": 8,
+   "steps": 21,
+   "perPass": 131,
+   "uniq": 254
+  },
+  {
+   "subj": "理科",
+   "grade": "小4",
+   "units": 8,
+   "steps": 27,
+   "perPass": 192,
+   "uniq": 264
+  },
+  {
+   "subj": "理科",
+   "grade": "小5",
+   "units": 8,
+   "steps": 23,
+   "perPass": 156,
+   "uniq": 190
+  },
+  {
+   "subj": "理科",
+   "grade": "小6",
+   "units": 9,
+   "steps": 29,
+   "perPass": 212,
+   "uniq": 431
+  },
+  {
+   "subj": "理科",
+   "grade": "中1",
+   "units": 13,
+   "steps": 19,
+   "perPass": 131,
+   "uniq": 501
+  },
+  {
+   "subj": "理科",
+   "grade": "中2",
+   "units": 10,
+   "steps": 21,
+   "perPass": 153,
+   "uniq": 743
+  },
+  {
+   "subj": "理科",
+   "grade": "中3",
+   "units": 10,
+   "steps": 21,
+   "perPass": 157,
+   "uniq": 576
+  },
+  {
+   "subj": "社会",
+   "grade": "小3",
+   "units": 4,
+   "steps": 13,
+   "perPass": 100,
+   "uniq": 130
+  },
+  {
+   "subj": "社会",
+   "grade": "小4",
+   "units": 4,
+   "steps": 13,
+   "perPass": 105,
+   "uniq": 241
+  },
+  {
+   "subj": "社会",
+   "grade": "小5",
+   "units": 4,
+   "steps": 18,
+   "perPass": 130,
+   "uniq": 163
+  },
+  {
+   "subj": "社会",
+   "grade": "小6",
+   "units": 5,
+   "steps": 21,
+   "perPass": 153,
+   "uniq": 471
+  },
+  {
+   "subj": "社会",
+   "grade": "中1",
+   "units": 7,
+   "steps": 19,
+   "perPass": 138,
+   "uniq": 634
+  },
+  {
+   "subj": "社会",
+   "grade": "中2",
+   "units": 6,
+   "steps": 14,
+   "perPass": 108,
+   "uniq": 450
+  },
+  {
+   "subj": "社会",
+   "grade": "中3",
+   "units": 4,
+   "steps": 18,
+   "perPass": 135,
+   "uniq": 191
+  },
+  {
+   "subj": "国語",
+   "grade": "小1",
+   "units": 4,
+   "steps": 8,
+   "perPass": 73,
+   "uniq": 519
+  },
+  {
+   "subj": "国語",
+   "grade": "小2",
+   "units": 4,
+   "steps": 10,
+   "perPass": 83,
+   "uniq": 514
+  },
+  {
+   "subj": "国語",
+   "grade": "小3",
+   "units": 5,
+   "steps": 10,
+   "perPass": 85,
+   "uniq": 595
+  },
+  {
+   "subj": "国語",
+   "grade": "小4",
+   "units": 5,
+   "steps": 12,
+   "perPass": 105,
+   "uniq": 560
+  },
+  {
+   "subj": "国語",
+   "grade": "小5",
+   "units": 4,
+   "steps": 12,
+   "perPass": 101,
+   "uniq": 520
+  },
+  {
+   "subj": "国語",
+   "grade": "小6",
+   "units": 4,
+   "steps": 12,
+   "perPass": 102,
+   "uniq": 558
+  },
+  {
+   "subj": "国語",
+   "grade": "中1",
+   "units": 6,
+   "steps": 12,
+   "perPass": 102,
+   "uniq": 490
+  },
+  {
+   "subj": "国語",
+   "grade": "中2",
+   "units": 5,
+   "steps": 12,
+   "perPass": 103,
+   "uniq": 530
+  },
+  {
+   "subj": "国語",
+   "grade": "中3",
+   "units": 5,
+   "steps": 10,
+   "perPass": 88,
+   "uniq": 521
+  },
+  {
+   "subj": "英語",
+   "grade": "小3",
+   "units": 4,
+   "steps": 14,
+   "perPass": 108,
+   "uniq": 825
+  },
+  {
+   "subj": "英語",
+   "grade": "小4",
+   "units": 4,
+   "steps": 12,
+   "perPass": 96,
+   "uniq": 458
+  },
+  {
+   "subj": "英語",
+   "grade": "小5",
+   "units": 5,
+   "steps": 12,
+   "perPass": 104,
+   "uniq": 577
+  },
+  {
+   "subj": "英語",
+   "grade": "小6",
+   "units": 5,
+   "steps": 13,
+   "perPass": 110,
+   "uniq": 482
+  },
+  {
+   "subj": "英語",
+   "grade": "中1",
+   "units": 7,
+   "steps": 13,
+   "perPass": 118,
+   "uniq": 914
+  },
+  {
+   "subj": "英語",
+   "grade": "中2",
+   "units": 4,
+   "steps": 12,
+   "perPass": 98,
+   "uniq": 197
+  },
+  {
+   "subj": "英語",
+   "grade": "中3",
+   "units": 4,
+   "steps": 11,
+   "perPass": 92,
+   "uniq": 169
+  }
+ ],
+ "tot": {
+  "units": 292,
+  "steps": 912,
+  "perPass": 7120,
+  "uniq": 79328
+ }
+}

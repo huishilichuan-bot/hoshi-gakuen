@@ -1,0 +1,5 @@
+screenshots/
+node_modules/
+__pycache__/
+*.pyc
+firestore-debug.log

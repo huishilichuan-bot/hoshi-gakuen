@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Disallow: /hoshi-gakuen/admin.html
+Sitemap: https://huishilichuan-bot.github.io/hoshi-gakuen/sitemap.xml

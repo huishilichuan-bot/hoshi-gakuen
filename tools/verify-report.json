@@ -1,0 +1,391 @@
+{
+ "seeds": 40,
+ "generatedChecked": 1039888,
+ "uniqueQuestions": 480480,
+ "stats": {
+  "chk": 430095,
+  "qx": 65639,
+  "ord": 4689,
+  "tf": 179614,
+  "odd": 63206,
+  "pairchk": 1658,
+  "nl": 4160,
+  "multi": 13567,
+  "ordx": 566,
+  "sort": 5989,
+  "expr": 20139,
+  "tap": 6684,
+  "sys": 6292,
+  "eqn": 3760,
+  "tiles": 21760,
+  "kanji": 40544,
+  "en4_tl": 32560,
+  "en4_mc": 43775,
+  "en4_sp": 32760,
+  "en4_passage_g5": 40,
+  "en4_ty": 21945,
+  "en4_passage_g6": 40,
+  "en4_passage_g7": 78,
+  "en4_passage_g8": 177,
+  "en4_passage_g9": 462
+ },
+ "problems": 0,
+ "cover": {
+  "math:1": {
+   "units": 12,
+   "steps": 147,
+   "filled": 147,
+   "gen": 147,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "math:2": {
+   "units": 12,
+   "steps": 150,
+   "filled": 150,
+   "gen": 150,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "math:3": {
+   "units": 15,
+   "steps": 148,
+   "filled": 148,
+   "gen": 148,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "math:4": {
+   "units": 15,
+   "steps": 156,
+   "filled": 156,
+   "gen": 156,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "math:5": {
+   "units": 18,
+   "steps": 162,
+   "filled": 162,
+   "gen": 162,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "math:6": {
+   "units": 12,
+   "steps": 157,
+   "filled": 157,
+   "gen": 157,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "math:7": {
+   "units": 7,
+   "steps": 135,
+   "filled": 135,
+   "gen": 135,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "math:8": {
+   "units": 7,
+   "steps": 129,
+   "filled": 129,
+   "gen": 129,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "math:9": {
+   "units": 9,
+   "steps": 138,
+   "filled": 138,
+   "gen": 138,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "life:1": {
+   "units": 5,
+   "steps": 49,
+   "filled": 49,
+   "gen": 33,
+   "bank": 16,
+   "bankQ": 134
+  },
+  "life:2": {
+   "units": 5,
+   "steps": 51,
+   "filled": 51,
+   "gen": 38,
+   "bank": 13,
+   "bankQ": 102
+  },
+  "sci:3": {
+   "units": 8,
+   "steps": 54,
+   "filled": 54,
+   "gen": 40,
+   "bank": 14,
+   "bankQ": 83
+  },
+  "sci:4": {
+   "units": 8,
+   "steps": 66,
+   "filled": 66,
+   "gen": 45,
+   "bank": 21,
+   "bankQ": 185
+  },
+  "sci:5": {
+   "units": 8,
+   "steps": 68,
+   "filled": 68,
+   "gen": 52,
+   "bank": 16,
+   "bankQ": 133
+  },
+  "sci:6": {
+   "units": 9,
+   "steps": 71,
+   "filled": 71,
+   "gen": 49,
+   "bank": 22,
+   "bankQ": 178
+  },
+  "sci:7": {
+   "units": 13,
+   "steps": 65,
+   "filled": 65,
+   "gen": 58,
+   "bank": 7,
+   "bankQ": 38
+  },
+  "sci:8": {
+   "units": 10,
+   "steps": 65,
+   "filled": 65,
+   "gen": 56,
+   "bank": 9,
+   "bankQ": 69
+  },
+  "sci:9": {
+   "units": 10,
+   "steps": 68,
+   "filled": 68,
+   "gen": 55,
+   "bank": 13,
+   "bankQ": 112
+  },
+  "soc:3": {
+   "units": 4,
+   "steps": 33,
+   "filled": 33,
+   "gen": 22,
+   "bank": 11,
+   "bankQ": 95
+  },
+  "soc:4": {
+   "units": 4,
+   "steps": 35,
+   "filled": 35,
+   "gen": 28,
+   "bank": 7,
+   "bankQ": 65
+  },
+  "soc:5": {
+   "units": 4,
+   "steps": 46,
+   "filled": 46,
+   "gen": 32,
+   "bank": 14,
+   "bankQ": 129
+  },
+  "soc:6": {
+   "units": 5,
+   "steps": 49,
+   "filled": 49,
+   "gen": 32,
+   "bank": 17,
+   "bankQ": 166
+  },
+  "soc:7": {
+   "units": 7,
+   "steps": 50,
+   "filled": 50,
+   "gen": 38,
+   "bank": 12,
+   "bankQ": 98
+  },
+  "soc:8": {
+   "units": 6,
+   "steps": 49,
+   "filled": 49,
+   "gen": 40,
+   "bank": 9,
+   "bankQ": 76
+  },
+  "soc:9": {
+   "units": 4,
+   "steps": 49,
+   "filled": 49,
+   "gen": 32,
+   "bank": 17,
+   "bankQ": 170
+  },
+  "ja:1": {
+   "units": 6,
+   "steps": 35,
+   "filled": 35,
+   "gen": 13,
+   "bank": 22,
+   "bankQ": 171
+  },
+  "ja:2": {
+   "units": 8,
+   "steps": 60,
+   "filled": 60,
+   "gen": 15,
+   "bank": 45,
+   "bankQ": 365
+  },
+  "ja:3": {
+   "units": 10,
+   "steps": 71,
+   "filled": 71,
+   "gen": 18,
+   "bank": 53,
+   "bankQ": 415
+  },
+  "ja:4": {
+   "units": 11,
+   "steps": 85,
+   "filled": 85,
+   "gen": 22,
+   "bank": 63,
+   "bankQ": 453
+  },
+  "ja:5": {
+   "units": 9,
+   "steps": 80,
+   "filled": 80,
+   "gen": 24,
+   "bank": 56,
+   "bankQ": 439
+  },
+  "ja:6": {
+   "units": 9,
+   "steps": 83,
+   "filled": 83,
+   "gen": 27,
+   "bank": 56,
+   "bankQ": 437
+  },
+  "ja:7": {
+   "units": 16,
+   "steps": 130,
+   "filled": 130,
+   "gen": 28,
+   "bank": 102,
+   "bankQ": 750
+  },
+  "ja:8": {
+   "units": 14,
+   "steps": 125,
+   "filled": 125,
+   "gen": 30,
+   "bank": 95,
+   "bankQ": 749
+  },
+  "ja:9": {
+   "units": 13,
+   "steps": 125,
+   "filled": 125,
+   "gen": 42,
+   "bank": 83,
+   "bankQ": 596
+  },
+  "en:3": {
+   "units": 10,
+   "steps": 30,
+   "filled": 30,
+   "gen": 30,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "en:4": {
+   "units": 11,
+   "steps": 33,
+   "filled": 33,
+   "gen": 33,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "en:5": {
+   "units": 12,
+   "steps": 36,
+   "filled": 36,
+   "gen": 36,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "en:6": {
+   "units": 13,
+   "steps": 39,
+   "filled": 39,
+   "gen": 39,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "en:7": {
+   "units": 14,
+   "steps": 42,
+   "filled": 42,
+   "gen": 42,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "en:8": {
+   "units": 15,
+   "steps": 45,
+   "filled": 45,
+   "gen": 45,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "en:9": {
+   "units": 16,
+   "steps": 48,
+   "filled": 48,
+   "gen": 48,
+   "bank": 0,
+   "bankQ": 0
+  }
+ },
+ "warns": {
+  "bank_ex_not_contain_answer": {
+   "n": 2605,
+   "sample": [
+    "math 3 / 三角形と角 / 角 :: 角の大きさは何で決まる？ => 辺の開きぐあい",
+    "math 3 / 三角形と角 / 角 :: 角の大きさは何で決まる？ => 辺の開きぐあい",
+    "math 3 / 三角形と角 / 角 :: 角の大きさは何で決まる？ => 辺の開きぐあい",
+    "math 3 / 三角形と角 / 角 :: 角の大きさは何で決まる？ => 辺の開きぐあい",
+    "math 3 / 三角形と角 / 角 :: 角の大きさは何で決まる？ => 辺の開きぐあい",
+    "math 3 / 三角形と角 / 角 :: 角の大きさは何で決まる？ => 辺の開きぐあい",
+    "math 3 / 三角形と角 / 角 :: 角の大きさは何で決まる？ => 辺の開きぐあい",
+    "math 3 / 三角形と角 / 角 :: 角の大きさは何で決まる？ => 辺の開きぐあい"
+   ]
+  },
+  "short_set": {
+   "n": 1280,
+   "sample": [
+    "math 3 / 三角形と角 / 三角形のせいしつ（ぜんぶえらぶ） 2/6",
+    "math 3 / 三角形と角 / 三角形のせいしつ（ぜんぶえらぶ） 2/6",
+    "math 3 / 三角形と角 / 三角形のせいしつ（ぜんぶえらぶ） 2/6",
+    "math 3 / 三角形と角 / 三角形のせいしつ（ぜんぶえらぶ） 2/6",
+    "math 3 / 三角形と角 / 三角形のせいしつ（ぜんぶえらぶ） 2/6",
+    "math 3 / 三角形と角 / 三角形のせいしつ（ぜんぶえらぶ） 2/6",
+    "math 3 / 三角形と角 / 三角形のせいしつ（ぜんぶえらぶ） 2/6",
+    "math 3 / 三角形と角 / 三角形のせいしつ（ぜんぶえらぶ） 2/6"
+   ]
+  }
+ }
+}
