@@ -402,9 +402,17 @@
   // ---------- 起動・画面を描いたあと ----------
   let checking = false;
   const queue = [];
+  // ログイン画面（はじめての案内・ログイン中）が出ているあいだは、相棒の案内を出さない
+  function authBusy() {
+    const L = document.getElementById("auth-layer"); if (L && !L.hidden && L.innerHTML.trim()) return true;
+    const U = window.HMAuthUI; if (!U || !U.enabled) return false;
+    let seen = ""; try { seen = localStorage.getItem("hoshigakuen-auth-seen"); } catch (e) {}
+    let user = null; try { user = U.state().user; } catch (e) {}
+    return !seen && !user;
+  }
   function afterRender(tab) {
     if (checking) return;
-    const busy = () => !!(document.getElementById("consent") || document.getElementById("gk-ov") || document.querySelector("#quiz:not([hidden])") || document.querySelector(".game-layer:not([hidden])") || document.querySelector(".auth-ov,#auth-ov") || window.__HM_NO_GK);
+    const busy = () => !!(document.getElementById("consent") || document.getElementById("gk-ov") || document.querySelector("#quiz:not([hidden])") || document.querySelector(".game-layer:not([hidden])") || document.querySelector(".auth-ov,#auth-ov") || document.getElementById("splash") || authBusy() || window.__HM_NO_GK);
     const go = () => {
       checking = false;
       if (busy()) { checking = true; return setTimeout(go, 700); }
