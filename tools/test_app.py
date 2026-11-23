@@ -1,10 +1,10 @@
 # ほしの学園 — ヘッドレスChrome（390×844）での自動テスト
 import json, subprocess, sys, time, os, random
 from playwright.sync_api import sync_playwright
-NOAUTH = "Object.defineProperty(window, 'HM_FIREBASE', { configurable: true, get() { return { enabled: false }; }, set() {} }); try{localStorage.setItem('hoshigakuen:consent',JSON.stringify({v:'2026-11-21',t:1}))}catch(e){}"  # 旧テストではログイン画面を出さない
+NOAUTH = "window.__HM_NO_GK = true; Object.defineProperty(window, 'HM_FIREBASE', { configurable: true, get() { return { enabled: false }; }, set() {} }); try{localStorage.setItem('hoshigakuen:consent',JSON.stringify({v:'2026-11-21',t:1}))}catch(e){}"  # 旧テストではログイン画面を出さない
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOT = os.path.join(ROOT, "screenshots"); os.makedirs(SHOT, exist_ok=True)
-PORT = 8765
+PORT = 8799
 srv = subprocess.Popen([sys.executable, "-m", "http.server", str(PORT)], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 time.sleep(0.8)
 results = []; errors = []
@@ -19,7 +19,7 @@ try:
     pg.on("console", lambda m: errors.append("console: " + m.text) if m.type == "error" else None)
     pg.goto(f"http://localhost:{PORT}/index.html"); pg.wait_for_timeout(1200)
     E = pg.evaluate
-    ok("ホーム表示", pg.locator(".hx").count() == 1 and pg.locator(".today2").count() == 1)
+    ok("ホーム表示", pg.locator(".gk-hero").count() == 1 and pg.locator(".today2").count() == 1)
     pg.screenshot(path=f"{SHOT}/01-home.png")
     # ナビゲーション：教科→学年→単元→ステップ
     pg.click('.tab[data-tab="study"]'); pg.wait_for_timeout(200)
@@ -125,17 +125,11 @@ try:
     ok("ガチャ確率（10回目SR以上）", dev2 < 0.25 and dist["sr"][0] == 0 and dist["sr"][1] == 0, "最大ずれ %.3f%%" % dev2)
     ok("確率の合計100%", abs(sum(dist["rates"]["normal"]) - 100) < 1e-9)
     # ガチャを引く（演出）
-    pg.click('.tab[data-tab="gacha"]'); pg.wait_for_timeout(200)
-    left = E("HM_APP.pullsLeft()"); ok("ガチャ回数＝⭐の数", left == 4, left)
-    pg.click('[data-g="1"]'); pg.wait_for_timeout(400); pg.click("#gacha-show"); pg.wait_for_timeout(600)
-    pg.screenshot(path=f"{SHOT}/09-gacha.png")
-    pg.click("#gs-close"); pg.wait_for_timeout(200)
-    ok("ガチャで回数が減る", E("HM_APP.pullsLeft()") == 3)
+    E("(()=>{const s=HM_APP.state(); s.gk=Object.assign(s.gk||{},{partner:'himuro'});})()")
+    pg.click('.tab[data-tab="gacha"]'); pg.wait_for_timeout(300)
+    ok("相棒タブを表示（v1.1.0）", pg.locator(".gk-pv").count() == 1 and pg.locator(".gk-oc").count() >= 8)
+    pg.screenshot(path=f"{SHOT}/09-partner.png")
     ok("ゲーム側の有利はすべて0", E("Object.entries(GF.advantage()).filter(([k,v])=>typeof v==='number' && k!=='level' && v!==0).length") == 0)
-    pg.click('[data-g="rates"]'); pg.wait_for_timeout(300)
-    ok("確率表を画面に表示", pg.locator("#rates-normal tr").count() == 8)
-    pg.screenshot(path=f"{SHOT}/10-rates.png")
-    E("document.querySelector('.sheet-close').click()"); pg.wait_for_timeout(300)
     # 報告
     E("HM_APP.startStep('math',1,0,0,{noCard:true})"); pg.wait_for_timeout(200)
     pg.click('#quiz .qz-q'); answer(True); pg.click('[data-q="report"]'); pg.wait_for_timeout(300)

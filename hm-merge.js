@@ -61,10 +61,30 @@
     }
     return out;
   }
+  // ほしの学園の相棒データ：コインは「ためた合計」と「使った合計」をそれぞれ多い方に（へらさない・二重に使えない）
+  function mergeGK(a, b, newerIsB) {
+    const x = obj(a), y = obj(b);
+    if (!Object.keys(x).length) return JSON.parse(JSON.stringify(y));
+    if (!Object.keys(y).length) return JSON.parse(JSON.stringify(x));
+    const nw = newerIsB ? y : x, od = newerIsB ? x : y;
+    const out = Object.assign({}, od, nw);
+    out.coins = { e: max(obj(x.coins).e, obj(y.coins).e), s: max(obj(x.coins).s, obj(y.coins).s) };
+    out.correct = max(x.correct, y.correct);
+    out.bond = {}; for (const k of new Set([...Object.keys(obj(x.bond)), ...Object.keys(obj(y.bond))])) out.bond[k] = max(obj(x.bond)[k], obj(y.bond)[k]);
+    out.owned = {}; for (const k of new Set([...Object.keys(obj(x.owned)), ...Object.keys(obj(y.owned))])) out.owned[k] = [...new Set([...arr(obj(x.owned)[k]), ...arr(obj(y.owned)[k])])];
+    out.wear = Object.assign({}, obj(od.wear), obj(nw.wear));
+    out.seen = Object.assign({}, obj(x.seen), obj(y.seen));
+    out.rival = {}; for (const k of new Set([...Object.keys(obj(x.rival)), ...Object.keys(obj(y.rival))])) { const p = obj(obj(x.rival)[k]), q = obj(obj(y.rival)[k]); out.rival[k] = { best: max(p.best, q.best), won: p.won || q.won ? 1 : 0 }; }
+    const lx = obj(x.login), ly = obj(y.login);
+    out.login = String(lx.last || "") >= String(ly.last || "") ? Object.assign({}, lx) : Object.assign({}, ly);
+    out.login.best = max(lx.best, ly.best);
+    out.partner = nw.partner || od.partner || null;
+    return out;
+  }
   // まだ何もしていない端末（はじめて開いただけ）の記録か
   function isBlank(st) {
     const days = Object.values(obj(st.days));
-    return !num(st.totalStars) && !num(st.pullsUsed) && !Object.keys(obj(st.progress)).length && !arr(st.wrongBox).length && !num(st.bestCombo) && !Object.keys(obj(st.chars)).some((k) => k !== "mori") && !Object.keys(obj(st.bossWins)).length && days.every((d) => !Object.keys(obj(d.steps)).length) && !(obj(st.settings).nick);
+    return !num(obj(obj(st.gk).coins).e) && !obj(st.gk).partner && !num(st.totalStars) && !num(st.pullsUsed) && !Object.keys(obj(st.progress)).length && !arr(st.wrongBox).length && !num(st.bestCombo) && !Object.keys(obj(st.chars)).some((k) => k !== "mori") && !Object.keys(obj(st.bossWins)).length && days.every((d) => !Object.keys(obj(d.steps)).length) && !(obj(st.settings).nick);
   }
   // 設定は新しい方を使い、空の項目（名前など）はもう一方でうめる
   function fillSettings(newer, older) {
@@ -104,6 +124,7 @@
     out.partner = out.chars[newer.partner] ? newer.partner : out.chars[L.partner] ? L.partner : Object.keys(out.chars)[0];
     out.last = newer.last || L.last || C.last || null;
     out.use = mergeUse(L.use, C.use);
+    out.gk = mergeGK(L.gk, C.gk, newer === C);
     out.lastActive = max(L.lastActive, C.lastActive);
     if (L.acct || C.acct) out.acct = obj(newer.acct).uid ? newer.acct : L.acct || C.acct;
     out.updatedAt = Math.max(num(L.updatedAt), num(C.updatedAt));
@@ -119,7 +140,7 @@
     while (bytes(json) > limit && arr(s.gachaLog).length) { s.gachaLog.splice(0, Math.max(1, Math.ceil(s.gachaLog.length / 4))); json = JSON.stringify(s); }
     return json;
   }
-  const api = { mergeStates, slimForCloud, isBlank, mergeUse };
+  const api = { mergeStates, slimForCloud, isBlank, mergeUse, mergeGK };
   root.HMMerge = api;
   if (typeof module !== "undefined") module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

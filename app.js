@@ -1,7 +1,7 @@
 /* ほしの学園 — 勉強して⭐を集める学習アプリ（小1〜中3）。課金・お金の機能はありません。 */
 (() => {
   "use strict";
-  const VERSION = "1.0.3";
+  const VERSION = "1.1.0";
   // 記録はプロフィールごとに分けて保存：ゲスト＝"hoshigakuen"、アカウント＝"hoshigakuen:u:<uid>"（ログアウトで消す）
   const GUEST_KEY = "hoshigakuen";
   let KEY = GUEST_KEY;
@@ -55,12 +55,12 @@
     { id: "s100", n: "学びの達人", ok: (c) => c.total >= 100, how: "⭐を合計100こ" },
     { id: "s300", n: "星の勇者", ok: (c) => c.total >= 300, how: "⭐を合計300こ" },
     { id: "s1000", n: "星の王", ok: (c) => c.total >= 1000, how: "⭐を合計1000こ" },
-    { id: "r1", n: "レアの持ち主", ok: (c) => c.maxR >= 1, how: "レア以上のなかま" },
-    { id: "r2", n: "スーパーレアの持ち主", ok: (c) => c.maxR >= 2, how: "スーパーレア以上" },
-    { id: "r3", n: "ウルトラレアの持ち主", ok: (c) => c.maxR >= 3, how: "ウルトラレア以上" },
-    { id: "r4", n: "激レアの持ち主", ok: (c) => c.maxR >= 4, how: "激レア以上" },
-    { id: "r5", n: "伝説の持ち主", ok: (c) => c.maxR >= 5, how: "伝説以上" },
-    { id: "r6", n: "神話の持ち主", ok: (c) => c.maxR >= 6, how: "神話のなかま" },
+    { id: "r1", n: "顔見知り", ok: (c) => c.maxR >= 1, how: "相棒の仲良し度 Lv2" },
+    { id: "r2", n: "声が聞こえる仲", ok: (c) => c.maxR >= 2, how: "相棒の仲良し度 Lv3" },
+    { id: "r3", n: "星の制服の持ち主", ok: (c) => c.maxR >= 3, how: "相棒の仲良し度 Lv5" },
+    { id: "r4", n: "心強い味方", ok: (c) => c.maxR >= 4, how: "相棒の仲良し度 Lv7" },
+    { id: "r5", n: "かけがえのない存在", ok: (c) => c.maxR >= 5, how: "相棒の仲良し度 Lv9" },
+    { id: "r6", n: "最高の相棒", ok: (c) => c.maxR >= 6, how: "相棒の仲良し度 Lv10" },
     { id: "boss1", n: "ボスハンター", ok: (c) => c.boss >= 1, how: "単元のボスに1回勝つ" },
     { id: "boss10", n: "ボスマスター", ok: (c) => c.boss >= 10, how: "10の単元でボスに勝つ" },
     { id: "boss50", n: "伝説のボスハンター", ok: (c) => c.boss >= 50, how: "50の単元でボスに勝つ" },
@@ -72,7 +72,7 @@
   function fresh() {
     return { schema: SCHEMA, created: now(), settings: { sound: true, haptic: true, nick: "", vol: 0.8, bgm: true, bgmVol: 0.5, remind: false, remindAt: "17:00", fs: "m", rmotion: false, grade: 0, hint: true }, days: {}, totalStars: 0, pulls: 0, pullsUsed: 0,
       chars: { mori: { n: 1, shards: 0, star: 0, t: now() } }, partner: "mori", look: { bg: "note", maru: "red", title: "first" },
-      progress: {}, last: null, reports: [], gachaLog: [], games: {}, wrongBox: [], boxGone: {}, bossWins: {}, boxCleared: 0, bestCombo: 0, use: {} };
+      progress: {}, last: null, reports: [], gachaLog: [], games: {}, wrongBox: [], boxGone: {}, bossWins: {}, boxCleared: 0, bestCombo: 0, use: {}, gk: {} };
   }
   function migrate(s) {
     if (!s || typeof s !== "object") return fresh();
@@ -104,7 +104,7 @@
   const starsToday = () => (state.days[today()] || { stars: 0 }).stars;
   const gamesOpen = () => starsToday() >= STARS_TO_UNLOCK;
   const pullsLeft = () => Math.max(0, state.pulls - state.pullsUsed);
-  const maxRarity = () => Math.max(...Object.keys(state.chars).map((id) => GCArt.charById(id).rarity));
+  const maxRarity = () => (window.HMGK ? HMGK.maxRank() : 0);
   const titleCtx = () => ({ total: state.totalStars, maxR: maxRarity(), boss: Object.keys(state.bossWins || {}).length, box: state.boxCleared || 0, combo: state.bestCombo || 0 });
 
   // ---------- 音・振動・トースト ----------
@@ -272,16 +272,17 @@
     if (tab === "home") m.innerHTML = viewHome();
     else if (tab === "study") { const r = viewStudy(); m.innerHTML = r.html; title = r.title; }
     else if (tab === "games") { m.innerHTML = viewGames(); title = "ゲーム"; }
-    else if (tab === "gacha") { m.innerHTML = viewGacha(); title = "なかま"; }
+    else if (tab === "gacha") { m.innerHTML = window.HMGK ? HMGK.view() : viewGacha(); title = "相棒"; }
     else if (tab === "settings") { m.innerHTML = viewSettings(); title = "マイページ"; }
     $("#top-title").textContent = title;
     $("#topbar").classList.toggle("large", !(tab === "study" && nav.length));
     const bl = $("#back-btn"); if (bl && !bl.hidden) { const pv = nav[nav.length - 2]; bl.innerHTML = '<span class="chev">‹</span>' + esc(!pv ? "学ぶ" : pv.v === "grades" ? subjById(pv.s).n : pv.v === "units" ? subjName(pv.s, pv.g) + gradeName(pv.g) : "もどる"); }
     mountPartner();
     bgmUpdate();
+    if (window.HMGK) HMGK.afterRender(tab);
   }
   function charLevelFor(id) { const e = state.chars[id]; const s = e ? e.star || 0 : 0; return [5, 15, 15, 30, 30, 50][s]; }
-  function charHtml(id, size, cls = "") { return '<div class="char ' + cls + '" style="width:' + size + "px;height:" + size + 'px">' + GCArt.charSvg(id, charLevelFor(id), { size }) + "</div>"; }
+  function charHtml(id, size, cls = "") { if (window.HMGK && HMGK.partner()) return HMGK.face(size, cls); return '<div class="char ' + cls + '" style="width:' + size + "px;height:" + size + 'px">' + GCArt.charSvg(id, charLevelFor(id), { size }) + "</div>"; }
   function rarityTag(r) { const R = GCArt.RARITIES[r]; return '<span class="rtag r' + r + '" style="--rc:' + R.c + '">' + R.n + "</span>"; }
   function starMarks(n) { return n ? '<span class="cstars">' + "★".repeat(n) + "</span>" : ""; }
   const titleName = () => (TITLES.find((t) => t.id === state.look.title && t.ok(titleCtx())) || TITLES[0]).n;
@@ -293,11 +294,7 @@
   function viewHome() {
     const p = GCArt.charById(state.partner), n = starsToday(), e = state.chars[p.id] || {}, need = Math.max(0, STARS_TO_UNLOCK - n);
     const line = HOME_LINES[(new Date().getDate() + n) % HOME_LINES.length];
-    let h = '<section class="hx r' + p.rarity + '"><div class="hx-bg"><i class="orb o1"></i><i class="orb o2"></i><i class="orb o3"></i><i class="sparkles"></i></div>' +
-      '<div class="hx-top"><span class="chip-t">🏅 ' + esc(titleName()) + '</span><span class="chip-t">累計 ⭐ ' + state.totalStars + "</span></div>" +
-      '<div class="hx-bubble" id="hx-bubble">' + esc(line) + "</div>" +
-      '<button type="button" class="hx-stage" id="partner" aria-label="相棒にタッチ"><span class="hx-glow"></span><span class="hx-char">' + charHtml(p.id, 220, "r" + p.rarity) + '</span><span class="hx-shadow"></span></button>' +
-      '<div class="hx-name"><b>' + esc(p.name) + "</b> " + rarityTag(p.rarity) + starMarks(e.star || 0) + "</div></section>";
+    let h = window.HMGK ? HMGK.homeHero() : '';
     h += '<section class="today2"><div class="t2-ring">' + ringSvg(n, STARS_TO_UNLOCK) + '<div class="t2-num"><b>' + n + '</b><small>/' + STARS_TO_UNLOCK + '</small></div></div><div class="t2-r"><div class="t2-k">今日の⭐</div>' +
       (need ? '<div class="t2-big">ゲームまで あと <b>' + need + "</b> 個</div>" : '<div class="t2-big ok">🎮 ゲーム解放中！</div>') +
       '<div class="t2-stars">' + Array.from({ length: STARS_TO_UNLOCK }, (_, i) => '<span class="t2s ' + (i < n ? "on" : "") + '" style="--i:' + i + '">★</span>').join("") + (n > STARS_TO_UNLOCK ? '<span class="t2-more">+' + (n - STARS_TO_UNLOCK) + "</span>" : "") + "</div></div></section>";
@@ -307,8 +304,8 @@
       if (st) h += '<button type="button" class="cont2" data-act="cont">' + HMIcons.icon(L.s, subjById(L.s).c, 46) + '<span class="grow"><b>つづきから学ぶ</b><span class="small">' + esc(subjName(L.s, L.g) + " " + gradeName(L.g) + " ／ " + st.unit.n + " ／ " + st.step.n) + '</span></span><span class="go">▶</span></button>';
     }
     h += '<div class="sec2">教科</div><div class="quick2">' + SUBJ.map((s, i) => '<button type="button" class="qb2" data-subj="' + s.id + '" style="--sc:' + s.c + ";--i:" + i + '">' + HMIcons.icon(s.id, s.c, 52) + "<b>" + esc(s.n) + "</b><small>" + (s.id === "life" ? "小1・小2" : s.id === "math" || s.id === "ja" ? "小1〜中3" : "小3〜中3") + "</small></button>").join("") + "</div>";
-    if (pullsLeft()) h += '<button type="button" class="gacha2" data-act="gacha"><span class="g2-box">🎁</span><span class="grow"><b>ガチャを ' + pullsLeft() + ' 回ひけます</b><span class="small">新しいなかまに会いに行こう</span></span><span class="go">▶</span></button>';
-    h += '<p class="foot">なかま ' + Object.keys(state.chars).length + "/" + GCArt.CHARACTERS.length + " ・ v" + VERSION + "</p>";
+    if (false && pullsLeft()) h += '<button type="button" class="gacha2" data-act="gacha"><span class="g2-box">🎁</span><span class="grow"><b>ガチャを ' + pullsLeft() + ' 回ひけます</b><span class="small">新しいなかまに会いに行こう</span></span><span class="go">▶</span></button>';
+    h += '<p class="foot">ほしの学園 v' + VERSION + "</p>";
     return h;
   }
   function mountPartner() {
@@ -668,7 +665,7 @@
   function celebrateStar(inline) {
     sound("star");
     const fx = $("#fx-root"), d = document.createElement("div");
-    d.className = "star-pop"; d.innerHTML = "<span>⭐</span><b>" + (Q && Q.starDup ? "合格！（このステップの⭐は今日もうもらったよ）" : "⭐ ゲット！ ガチャ1回") + "</b>";
+    d.className = "star-pop"; d.innerHTML = "<span>⭐</span><b>" + (Q && Q.starDup ? "合格！（このステップの⭐は今日もうもらったよ）" : "⭐ ゲット！") + "</b>";
     fx.appendChild(d); setTimeout(() => d.remove(), 1800);
     if (!(Q && Q.starDup)) { confetti(50); burstAt(innerWidth / 2, innerHeight * 0.45, 26); haptic([20, 30, 50]); }
     $("#top-stars").innerHTML = topStars();
@@ -684,9 +681,8 @@
     const p = GCArt.charById(state.partner), combined = Q.baseCorrect + (Q.retryCorrect || 0), passed = combined >= Q.need;
     const pick = (a) => a[Math.floor(Math.random() * a.length)];
     let kind = Q.mode === "main" && Q.baseCorrect === Q.n ? "perfect" : passed ? "pass" : "not";
-    let line = pick(PRAISE[kind]);
+    let line = (window.HMGK && HMGK.sumLine(kind)) || pick(PRAISE[kind]);
     if (Q.mode === "main" && Q.prevBest != null && Q.baseCorrect > Q.prevBest) line = pick(PRAISE.up) + " " + line;
-    if (SPECIAL[p.rarity] && passed) line += " " + SPECIAL[p.rarity];
     const wrong = Q.mode === "main" ? Q.results.filter((r) => !r.ok && !r.skip).map((r) => r.q) : Q.wrongLeft;
     const pct = Math.round((combined / Q.n) * 100);
     let h = '<div class="sum">';
@@ -695,12 +691,11 @@
     if (Q.mode === "main" && Q.prevBest != null) h += '<div class="small">前回までのベスト ' + Q.prevBest + " → 今回 " + Q.baseCorrect + (Q.baseCorrect > Q.prevBest ? ' <b class="up">+' + (Q.baseCorrect - Q.prevBest) + "</b>" : "") + "</div>";
     if (Q.mode === "retry") h += '<div class="small">最初 ' + Q.baseCorrect + "問 ＋ やり直し " + Q.retryCorrect + "問</div>";
     h += "</div></div>";
-    h += '<div class="sum-star ' + (Q.starGiven ? "got" : "") + '">' + (Q.starGiven ? (Q.starNew ? "⭐ を1こゲット！ ガチャが1回ひけます" : "合格！（このステップの⭐は今日もうもらったよ。ほかのステップで⭐を集めよう）") : "⭐ はまだ。まちがえた問題をやり直すと、合わせて6割で⭐！") + "</div>";
+    h += '<div class="sum-star ' + (Q.starGiven ? "got" : "") + '">' + (Q.starGiven ? (Q.starNew ? "⭐ を1こゲット！ 学園の空がまた明るくなったよ" : "合格！（このステップの⭐は今日もうもらったよ。ほかのステップで⭐を集めよう）") : "⭐ はまだ。まちがえた問題をやり直すと、合わせて6割で⭐！") + "</div>";
     h += '<div class="sum-char">' + charHtml(p.id, 110, "bob r" + p.rarity + (p.rarity >= 4 ? " glow" : "")) + '<div class="bubble">' + esc(line) + "</div></div>";
     h += '<div class="today-mini">今日の⭐ ' + topStars() + (gamesOpen() ? ' <span class="ok">🎮 ゲーム解放中</span>' : " あと" + (STARS_TO_UNLOCK - starsToday()) + "こでゲーム") + "</div>";
     h += '<div class="sum-act">';
     if (wrong && wrong.length) h += '<button type="button" class="btn ' + (passed ? "" : "primary") + ' block" data-q="retry">🔁 まちがえた ' + wrong.length + " 問をやり直す</button>";
-    if (Q.starNew && pullsLeft()) h += '<button type="button" class="btn gold block" data-q="gacha">🎁 ガチャをひく</button>';
     const nx = findStep(Q.s, Q.g, Q.ui, Q.si + 1);
     if (nx) h += '<button type="button" class="btn ' + (passed ? "primary" : "") + ' block" data-q="nextstep">次のステップ：' + esc(nx.step.n) + " ›</button>";
     h += '<button type="button" class="btn block" data-q="again">もう一度このステップ</button><button type="button" class="btn ghost block" data-q="quit">単元にもどる</button></div>';
@@ -748,6 +743,7 @@
   function afterAnswer(q, ok) {
     Q.combo = ok ? (Q.combo || 0) + 1 : 0;
     if (Q.combo > (state.bestCombo || 0)) state.bestCombo = Q.combo;
+    try { if (window.HMGK) HMGK.onAnswer(ok, Q.combo); } catch (e) {}
     if (!ok && Q.mode !== "box") boxAdd(q);
     if (ok && (Q.mode === "box" || Q.mode === "retry")) { if (boxRemove(q) && Q.mode === "box") Q.cleared = (Q.cleared || 0) + 1; }
     save();
@@ -1345,7 +1341,7 @@
     // プロフィール（保存場所）を切りかえる。data があればそれを使い、なければその場所の記録を読む
     useProfile: (key, data, opt) => { KEY = key || GUEST_KEY; let d = data; if (d === undefined) { try { d = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { d = null; } } state = migrate(d ? JSON.parse(JSON.stringify(d)) : null); try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} if (Q && !$("#quiz").hidden) { try { quitQuiz(); } catch (e) {} } if (opt && opt.home) { tab = "home"; nav = []; navDir = "tab"; } render(); },
     setAcct: (a) => { if (!a || !a.uid) return; const cur = state.acct || {}; if (cur.uid === a.uid && cur.email === a.email && cur.name === a.name && cur.provider === a.provider) return; state.acct = { uid: a.uid, email: a.email || "", name: a.name || "", provider: a.provider || "" }; save(); },
-    profileKey: () => KEY, GUEST_KEY, charHtml, sound, toast, haptic, openSheet, closeSheet, startBox, startBoss, startStep, speak, canSpeak };
+    profileKey: () => KEY, GUEST_KEY, charHtml, setTab: (t) => { tab = t; nav = []; render(); }, _ans: (ok) => { const q = curList()[Q.i]; Q.shownAt = -1e9; answer(q.t === "ch" ? (ok ? q.a : "__x__") : { ok, text: ok ? q.a : "x" }); }, sound, toast, haptic, openSheet, closeSheet, startBox, startBoss, startStep, speak, canSpeak };
 
   // テスト用：?clock=+86400000 のように時計をずらせる
   try { const c = new URLSearchParams(location.search).get("clock"); if (c) clockOffset = +c || 0; } catch (e) {}
