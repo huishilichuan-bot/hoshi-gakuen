@@ -1254,3 +1254,6 @@ html.rmotion .mode-sel, html.rmotion .ms-slot { animation: none; }
 .gk-in-hint { margin: 18px 0; text-align: center; opacity: .7; font-size: 14px; }
 @media (min-width: 700px) { .gk-hero { height: 470px; margin-left: 0; margin-right: 0; border-radius: 28px; } .gk-stand { height: 392px; width: 40%; right: 8%; } .gk-bub { width: 38%; left: 6%; top: 90px; font-size: 16px; } .gk-outfits { grid-template-columns: repeat(4, 1fr); } .gk-card-stage { height: 420px; } }
 @media (prefers-reduced-motion: reduce) { .gk-body, .gk-aura, .gk-fx i, .gk-hearts i.on, .gk-shoot, .gk-sky .tw { animation: none !important; } }
+
+/* v1.1.2 漢字練習のステップ名：字の列は2行目に小さく */
+.kj-ls { display: block; margin-top: 2px; font-size: 13px; font-weight: 700; letter-spacing: .02em; opacity: .85; line-height: 1.35; } .kj-ls span { display: block; white-space: nowrap; }
