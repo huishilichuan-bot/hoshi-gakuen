@@ -20,9 +20,6 @@ async function realAdapter() {
   const base = "https://www.gstatic.com/firebasejs/" + (CFG.sdk || "12.6.0") + "/";
   const [A, AU, FS] = await Promise.all([import(base + "firebase-app.js"), import(base + "firebase-auth.js"), import(base + "firebase-firestore.js")]);
   const app = A.initializeApp(CFG.config);
-  // 別のタブ・別の画面で Google から戻ってきたとき（アプリの中のブラウザなど）も、ログインのとちゅうだと分かるように
-  const PRK = "firebase:pendingRedirect:" + CFG.config.apiKey + ":[DEFAULT]", PR_MARK = "hoshigakuen:pr";
-  try { const t = +localStorage.getItem(PR_MARK) || 0; if (t && Date.now() - t < 9e5) { if (!sessionStorage.getItem(PRK)) sessionStorage.setItem(PRK, '"true"'); } else localStorage.removeItem(PR_MARK); } catch (e) {}
   const auth = AU.initializeAuth(app, { persistence: [AU.indexedDBLocalPersistence, AU.browserLocalPersistence], popupRedirectResolver: AU.browserPopupRedirectResolver });
   auth.languageCode = "ja";
   // 端末の中には Firestore のデータを残さない（メモリだけ）。ログアウトしたら何ものこらない
@@ -37,11 +34,11 @@ async function realAdapter() {
     google: async () => {
       try { return await AU.signInWithPopup(auth, gp()); }
       catch (e) {
-        if (/popup-blocked|operation-not-supported-in-this-environment|internal-error|web-storage-unsupported/.test(e.code || "")) { try { localStorage.setItem(PR_MARK, String(Date.now())); } catch (x) {} await AU.signInWithRedirect(auth, gp()); return null; }
+        if (/popup-blocked|operation-not-supported-in-this-environment|internal-error|web-storage-unsupported/.test(e.code || "")) { await AU.signInWithRedirect(auth, gp()); return null; }
         throw e;
       }
     },
-    redirectResult: () => AU.getRedirectResult(auth).finally(() => { try { localStorage.removeItem(PR_MARK); } catch (e) {} }),
+    redirectResult: () => AU.getRedirectResult(auth),
     emailIn: (e, p) => AU.signInWithEmailAndPassword(auth, e, p),
     emailUp: (e, p) => AU.createUserWithEmailAndPassword(auth, e, p),
     reset: (e) => AU.sendPasswordResetEmail(auth, e),
