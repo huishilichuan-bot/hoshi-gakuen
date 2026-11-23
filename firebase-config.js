@@ -5,7 +5,7 @@ window.HM_FIREBASE = {
   sdk: "12.6.0",
   config: {
     apiKey: "AIzaSyBwgS3DnEhABKgTcRHL3S8Dt11KM5yUQcI",
-    authDomain: "hoshi-gakuen.firebaseapp.com",
+    authDomain: "huishilichuan-bot.github.io", // ログイン用ヘルパーを同じオリジンで配信（https://huishilichuan-bot.github.io/__/auth/）。iPhone の Safari でもログインできる
     projectId: "hoshi-gakuen",
     storageBucket: "hoshi-gakuen.firebasestorage.app",
     messagingSenderId: "260767197064",
