@@ -430,11 +430,21 @@
       const lim = ROAD_W - 0.7;
       if (Math.abs(lat) > lim) {
         const over = Math.abs(lat) - lim, sgn = lat > 0 ? 1 : -1;
-        r.x -= side.x * sgn * over; r.z -= side.z * sgn * over;
-        r.speed *= 0.55;
+        r.x -= side.x * sgn * (over + 0.04);
+        r.z -= side.z * sgn * (over + 0.04);
+        // 進行方向をコースに戻して、壁に擦り続けて止まらないようにする
+        const want = Math.atan2(tan.x, tan.z);
+        let err = want - r.yaw;
+        while (err > Math.PI) err -= Math.PI * 2;
+        while (err < -Math.PI) err += Math.PI * 2;
+        r.yaw += err * 0.55;
+        r.slip *= 0.4;
         const first = r.hit <= 0;
-        r.hit = 0.25;
-        if (first && r.me) { shake.add(7); FX.SFX.crash(); fx3.burst(new T.Vector3(r.x, 0.3, r.z), ["#fff", "#ffd43b"], 10, 5, 0.35); }
+        if (first) {
+          r.speed *= 0.78;
+          r.hit = 0.18;
+          if (r.me) { shake.add(7); FX.SFX.crash(); fx3.burst(new T.Vector3(r.x, 0.3, r.z), ["#fff", "#ffd43b"], 10, 5, 0.35); }
+        }
         return true;
       }
       return false;
