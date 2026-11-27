@@ -1,7 +1,7 @@
 /* ほしの学園 — 勉強して⭐を集める学習アプリ（小1〜中3）。課金・お金の機能はありません。 */
 (() => {
   "use strict";
-  const VERSION = "1.4.0";
+  const VERSION = "1.5.0";
   // 記録はプロフィールごとに分けて保存：ゲスト＝"hoshigakuen"、アカウント＝"hoshigakuen:u:<uid>"（ログアウトで消す）
   const GUEST_KEY = "hoshigakuen";
   let KEY = GUEST_KEY;
@@ -25,6 +25,11 @@
     { id: "sci", n: "理科", e: "🔬", c: "#8a5cd6" },
     { id: "soc", n: "社会", e: "🗾", c: "#e08a12" },
     { id: "en", n: "英語", e: "🔤", c: "#1f9a82" },
+    { id: "tech", n: "技術", e: "🔧", c: "#3f6f8a" },
+    { id: "home", n: "家庭", e: "🏠", c: "#c43b6e" },
+    { id: "music", n: "音楽", e: "🎵", c: "#5b3ea8" },
+    { id: "art", n: "美術", e: "🎨", c: "#d946a6" },
+    { id: "pe", n: "保健体育", e: "🏃", c: "#2f9e62" },
   ];
   const subjById = (id) => SUBJ.find((s) => s.id === id);
   const gradeName = (g) => (g <= 6 ? "小" + g : "中" + (g - 6));
@@ -321,7 +326,7 @@
       const L = resolveLast(), st = findStep(L.s, L.g, L.u, L.st);
       if (st) h += '<button type="button" class="cont2" data-act="cont">' + HMIcons.icon(L.s, subjById(L.s).c, 46) + '<span class="grow"><b>つづきから学ぶ</b><span class="small">' + esc(subjName(L.s, L.g) + " " + gradeName(L.g) + " ／ " + st.unit.n + " ／ " + SN(st.step.n)) + '</span></span><span class="go">▶</span></button>';
     }
-    h += '<div class="sec2">教科</div><div class="quick2">' + SUBJ.map((s, i) => '<button type="button" class="qb2" data-subj="' + s.id + '" style="--sc:' + s.c + ";--i:" + i + '">' + HMIcons.icon(s.id, s.c, 52) + "<b>" + esc(s.n) + "</b><small>" + (s.id === "life" ? "小1・小2" : s.id === "math" || s.id === "ja" ? "小1〜中3" : "小3〜中3") + "</small></button>").join("") + "</div>";
+    h += '<div class="sec2">教科</div><div class="quick2">' + SUBJ.map((s, i) => { const gs = gradesOf(s.id); const gl = !gs.length ? "" : gs.length === 1 ? gradeName(gs[0]) : (gs.length === 2 && gs[1] === gs[0] + 1 ? gradeName(gs[0]) + "・" + gradeName(gs[1]) : gradeName(gs[0]) + "〜" + gradeName(gs[gs.length - 1])); return '<button type="button" class="qb2" data-subj="' + s.id + '" style="--sc:' + s.c + ";--i:" + i + '">' + HMIcons.icon(s.id, s.c, 52) + "<b>" + esc(s.n) + "</b><small>" + gl + "</small></button>"; }).join("") + "</div>";
     if (false && pullsLeft()) h += '<button type="button" class="gacha2" data-act="gacha"><span class="g2-box">🎁</span><span class="grow"><b>ガチャを ' + pullsLeft() + ' 回ひけます</b><span class="small">新しいなかまに会いに行こう</span></span><span class="go">▶</span></button>';
     h += '<p class="foot">ほしの学園 v' + VERSION + "</p>";
     return h;
@@ -355,7 +360,7 @@
 
   // ---------- v1.3.0 単元マーク・復習・予習・テスト対策 ----------
   const MARK_OK = 90, MARK_MID = 60;
-  const PREP_SUBJ = ["math", "ja", "life", "sci", "soc", "en"];
+  const PREP_SUBJ = ["math", "ja", "life", "sci", "soc", "en", "tech", "home", "music", "art", "pe"];
   function markOf(pct) { if (pct == null) return ""; return pct >= MARK_OK ? "ok" : pct >= MARK_MID ? "mid" : "ng"; }
   function markIcon(m) { return m === "ok" ? "✅" : m === "mid" ? "△" : m === "ng" ? "❌" : ""; }
   function markLabel(m, pct) { return m ? '<span class="umark ' + m + '">' + markIcon(m) + " " + pct + "%</span>" : '<span class="umark none">まだ</span>'; }
@@ -2022,7 +2027,7 @@
     return h;
   }
   function openAbout() {
-    openSheet('<h2>ほしの学園 <small class="muted">v' + VERSION + '</small></h2><p>小1〜中3の算数・数学、国語（漢字の書き練習）、生活、理科、社会、英語。学習指導要領（平成29年告示）の内容にそって作っています。</p><p>⭐は1ステップ6割以上（切り上げ）で1こ（同じステップは1日1回）。⭐4こで、その日のゲームがひらきます。⭐はへりません。なかまや着せかえは見た目だけのごほうびです。</p><p><b>データの保存</b>：ログインしないときは、この端末の中（ブラウザ）にだけ保存します。ログインすると、記録を Firebase に保存して、ほかの端末と同期します。</p><p class="small muted">算数・数学の問題はプログラムで作り、答えを別の計算で確かめています。まちがいを見つけたら「この問題おかしい？」で教えてください。</p><p class="small legal-links"><a href="./privacy.html">プライバシーポリシー</a> ・ <a href="./terms.html">利用規約</a> ・ <a href="./legal.html">ライセンス・表記</a></p>', { label: "バージョン情報" });
+    openSheet('<h2>ほしの学園 <small class="muted">v' + VERSION + '</small></h2><p>小1〜中3の算数・数学、国語（漢字の書き練習）、生活、理科、社会、英語と、中学の技術・家庭・音楽・美術・保健体育。学習指導要領（平成29年告示）の内容にそって作っています。</p><p>⭐は1ステップ6割以上（切り上げ）で1こ（同じステップは1日1回）。⭐4こで、その日のゲームがひらきます。⭐はへりません。なかまや着せかえは見た目だけのごほうびです。</p><p><b>データの保存</b>：ログインしないときは、この端末の中（ブラウザ）にだけ保存します。ログインすると、記録を Firebase に保存して、ほかの端末と同期します。</p><p class="small muted">算数・数学の問題はプログラムで作り、答えを別の計算で確かめています。まちがいを見つけたら「この問題おかしい？」で教えてください。</p><p class="small legal-links"><a href="./privacy.html">プライバシーポリシー</a> ・ <a href="./terms.html">利用規約</a> ・ <a href="./legal.html">ライセンス・表記</a></p>', { label: "バージョン情報" });
   }
   function openProfile() {
     const st = state.settings;
