@@ -12,6 +12,43 @@
   const img = (id) => "./img/gk/" + id + ".webp";
   const faceImg = (id) => "./img/gk/" + id + "-face.webp";
 
+  // 学習単元の合格数に応じた「すがた」段階（きせかえ・仲良し度とは別。全相棒で同じレベル）
+  const LOOK = {
+    per: 50, max: 10,
+    names: ["ねぼすけ", "よれたシャツ", "きてみた制服", "きちんと通学", "決まりはじめ", "自信のまなざし", "赤いジャージ", "星のきざし", "星の制服", "星の英雄"],
+    teacherNames: ["ねぼすけ", "よれたシャツ", "きてみたベスト", "きちんと出勤", "決まりはじめ", "自信のまなざし", "赤いジャージ", "星のきざし", "星の制服", "星の英雄"],
+  };
+  function passedSections() {
+    try {
+      const p = (S() || {}).progress || {};
+      return Object.values(p).filter((x) => x && x.passed).length;
+    } catch (e) { return 0; }
+  }
+  function lookLv(n) {
+    const s = n == null ? passedSections() : n;
+    return Math.min(LOOK.max, 1 + Math.floor(s / LOOK.per));
+  }
+  function lookName(cid, lv) {
+    const c = byId(cid);
+    const names = c && c.role === "t" ? LOOK.teacherNames : LOOK.names;
+    return names[Math.max(0, Math.min(names.length - 1, (lv || 1) - 1))];
+  }
+  const lookPad = (lv) => String(lv).padStart(2, "0");
+  const lookSrc = (id, lv) => "./img/gk/look/" + id + "-lv" + lookPad(lv) + ".webp";
+  const lookFaceSrc = (id, lv) => "./img/gk/look/" + id + "-lv" + lookPad(lv) + "-face.webp";
+  function lookProg(cid) {
+    const s = passedSections(), lv = lookLv(s), maxed = s >= (LOOK.max - 1) * LOOK.per;
+    const into = maxed ? LOOK.per : (s % LOOK.per);
+    return { s, lv, name: lookName(cid, lv), into, per: LOOK.per, maxed };
+  }
+  function lookBarHtml(cid) {
+    const p = lookProg(cid);
+    let h = '<div class="gk-look"><div class="gk-look-h">すがた <b>Lv' + p.lv + "</b> " + esc(p.name) + "</div>";
+    h += '<span class="gk-bar" aria-hidden="true"><i style="width:' + Math.round((p.maxed ? 1 : p.into / p.per) * 100) + '%"></i></span>';
+    h += "<small>" + (p.maxed ? String(p.s) : (p.into + "/" + p.per)) + "</small></div>";
+    return h;
+  }
+
   // ---------- ルール（固定の数字） ----------
   const R = { correct: 10, c5: 20, c10: 50, daily: 30, week7: 200, rivalWin: 100, bondCorrect: 1, bondC10: 10, perLv: 100, maxLv: 10 };
   const TITLES = ["はじめまして", "顔見知り", "知り合い", "なかよし", "信頼できる仲", "息ぴったり", "心強い味方", "大切な仲間", "かけがえのない存在", "最高の相棒"];
@@ -115,16 +152,19 @@
   }
 
   // ---------- 見た目の部品 ----------
-  function face(size, cls, cid) {
+  function face(size, cls, cid, lv) {
     const c = byId(cid || G().partner) || CHARS[0];
-    return '<span class="gk-face ' + (cls || "") + '" style="width:' + size + "px;height:" + size + "px;--gc:" + c.color + '"><img src="' + faceImg(c.id) + '" alt="' + esc(c.name) + '" loading="lazy" decoding="async"></span>';
+    const src = lookFaceSrc(c.id, lv || lookLv());
+    return '<span class="gk-face ' + (cls || "") + '" style="width:' + size + "px;height:" + size + "px;--gc:" + c.color + '"><img src="' + src + '" alt="' + esc(c.name) + '" loading="lazy" decoding="async"></span>';
   }
   function fxSpans(o, n) { let h = '<span class="gk-fx" aria-hidden="true">'; for (let i = 0; i < n; i++) h += '<i style="--i:' + i + ";--x:" + ((i * 37) % 100) + "%;--d:" + (4 + (i % 4) * 1.3).toFixed(1) + 's">' + o.fx[i % o.fx.length] + "</i>"; return h + "</span>"; }
   function stage(c, opt) {
     opt = opt || {};
     const oid = opt.outfit || wearing(c.id), o = outfitById(oid), lv = lvOf(c.id), best = lv >= R.maxLv && (oid === "best" || opt.best);
-    return '<div class="gk-stage o-' + o.id + (best ? " best" : "") + (opt.cls ? " " + opt.cls : "") + '" style="--gc:' + c.color + '">' + '<span class="gk-aura"></span>' + fxSpans(o, opt.fxn || 8) +
-      '<img class="gk-body" src="' + img(c.id) + '" alt="' + esc(c.name) + '" decoding="async"' + (opt.eager ? "" : ' loading="lazy"') + ">" + (o.id !== "base" ? '<span class="gk-coord">' + esc(o.n) + "</span>" : "") + "</div>";
+    const useLook = oid === "base";
+    const src = useLook ? lookSrc(c.id, opt.look || lookLv()) : img(c.id);
+    return '<div class="gk-stage o-' + o.id + (best ? " best" : "") + (useLook ? " look" + (opt.look || lookLv()) : "") + (opt.cls ? " " + opt.cls : "") + '" style="--gc:' + c.color + '">' + '<span class="gk-aura"></span>' + fxSpans(o, opt.fxn || 8) +
+      '<img class="gk-body" src="' + src + '" alt="' + esc(c.name) + '" decoding="async"' + (opt.eager ? "" : ' loading="lazy"') + ">" + (o.id !== "base" ? '<span class="gk-coord">' + esc(o.n) + "</span>" : "") + "</div>";
   }
   function hearts(cid, small) {
     const lv = lvOf(cid), p = lvProg(cid);
@@ -145,7 +185,7 @@
       '<div class="gk-top">' + coinChip() + '<span class="gk-chip">✨ 学園の空 Lv' + sl + "</span></div>" +
       '<div class="gk-bub" id="gk-bub">' + esc(ln) + "</div>" +
       '<button type="button" class="gk-stand" id="gk-partner" data-gk="tap" aria-label="' + esc(c.call) + 'にタッチ">' + stage(c, { eager: true, fxn: 6 }) + "</button>" +
-      '<div class="gk-plate"><div class="gk-name"><b>' + esc(c.name) + "</b><small>" + esc(c.roleN) + "</small></div>" + hearts(c.id, true) + "</div>" +
+      '<div class="gk-plate"><div class="gk-name"><b>' + esc(c.name) + "</b><small>" + esc(c.roleN) + "</small></div>" + hearts(c.id, true) + lookBarHtml(c.id) + "</div>" +
       '<div class="gk-skycap">正解すると、学園の空に星が増えていくよ ・ 星 ' + fmtN(Math.min(160, 6 + g.correct)) + "こ</div></section>" + rivalCard();
   }
   function rivalCard() {
@@ -162,7 +202,7 @@
     const lv = lvOf(c.id);
     let h = '<div class="gk-pv"><section class="gk-card" style="--gc:' + c.color + '"><div class="gk-card-top">' + coinChip() + '<button type="button" class="gk-chip" data-gk="rules">❔ コインのため方</button></div>' +
       '<div class="gk-card-stage">' + stage(c, { eager: true, fxn: 10 }) + "</div>" +
-      '<div class="gk-card-info"><div class="gk-name lg"><b>' + esc(c.name) + "</b><small>" + esc(c.kana) + " ・ " + esc(c.roleN) + '</small></div><div class="gk-tag">' + esc(c.tag) + "</div>" + hearts(c.id) +
+      '<div class="gk-card-info"><div class="gk-name lg"><b>' + esc(c.name) + "</b><small>" + esc(c.kana) + " ・ " + esc(c.roleN) + '</small></div><div class="gk-tag">' + esc(c.tag) + "</div>" + hearts(c.id) + lookBarHtml(c.id) +
       '<div class="gk-say" id="gk-say">「' + esc(line(c, lv >= 2 ? "tap2" : "tap1")) + "」</div>" +
       '<div class="gk-row-btns"><button type="button" class="btn sm ghost" data-gk="talk">💬 話しかける</button>' + (lv >= 3 ? '<button type="button" class="btn sm ghost" data-gk="voice">' + (G().voice === 0 ? "🔇 声：オフ" : "🔊 声：オン") + "</button>" : "") + '<button type="button" class="btn sm ghost" data-gk="prof" data-c="' + c.id + '">📝 プロフィール</button></div></div></section>';
     // きせかえ
@@ -179,6 +219,7 @@
         '<span class="gk-oc-prev">' + fxSpans(o, 3) + face(46, "", c.id) + "</span><b>" + esc(o.n) + "</b>" + (CAT_N[o.cat] ? '<small class="gk-cat c-' + o.cat + '">' + CAT_N[o.cat] + (season ? " " + o.months.join("・") + "月" : "") + "</small>" : "<small>&nbsp;</small>") + st + "</button>";
     }
     h += "</div>";
+    h += lookZukan(c.id);
     // ストーリー
     h += '<div class="sec">' + esc(c.call) + "のストーリー</div><div class=\"gk-stories\">";
     c.story.forEach((ch, i) => { const ok = lv >= STORY_LV[i], read = G().seen["st:" + c.id + ":" + i]; h += '<button type="button" class="gk-st' + (ok ? "" : " lock") + '" data-gk="' + (ok ? "story" : "lockinfo") + '" data-ch="' + i + '" data-need="' + STORY_LV[i] + '"><span class="gk-st-n">' + (ok ? "📖" : "🔒") + '</span><span class="grow"><b>' + esc(ch.t) + "</b><small>" + (ok ? (read ? "読んだ" : "NEW！ 読めるよ") : "仲良し度 Lv" + STORY_LV[i] + " で解放") + "</small></span></button>"; });
@@ -190,6 +231,26 @@
       CHARS.map((x) => '<button type="button" class="gk-pc' + (x.id === c.id ? " on" : "") + '" data-gk="prof" data-c="' + x.id + '" style="--gc:' + x.color + '">' + face(64, "", x.id) + "<b>" + esc(x.name) + "</b><small>" + esc(x.roleN) + '</small><span class="gk-pc-lv">♥ Lv' + lvOf(x.id) + "</span></button>").join("") + "</div>";
     h += '<p class="foot">コインは勉強でたまるよ（課金はありません）</p></div>';
     return h;
+  }
+
+  function lookZukan(cid) {
+    const cur = lookLv();
+    let h = '<div class="sec">すがたずかん <span class="muted small">いま すがた Lv' + cur + " " + esc(lookName(cid, cur)) + '</span></div><div class="gk-zukan">';
+    for (let i = 1; i <= LOOK.max; i++) {
+      const ok = i <= cur, nm = lookName(cid, i);
+      if (ok) {
+        h += '<button type="button" class="gk-zk" data-gk="look" data-lv="' + i + '" data-c="' + cid + '"><img src="' + lookFaceSrc(cid, i) + '" alt="Lv' + i + " " + esc(nm) + '"><b>Lv' + i + "</b><small>" + esc(nm) + "</small></button>";
+      } else {
+        h += '<button type="button" class="gk-zk is-lock" data-gk="looklock" data-lv="' + i + '"><img class="sil" src="' + lookFaceSrc(cid, i) + '" alt=""><b>Lv' + i + "</b><small>　</small></button>";
+      }
+    }
+    return h + "</div>";
+  }
+  function lookSheet(cid, lv) {
+    const c = byId(cid) || partner();
+    if (!c || lv < 1 || lv > lookLv()) return;
+    A().openSheet('<div class="gk-looksheet" style="--gc:' + c.color + '">' + stage(c, { eager: true, fxn: 8, outfit: "base", look: lv, cls: "prof" }) +
+      "<h2>すがた <b>Lv" + lv + "</b></h2><p>" + esc(lookName(c.id, lv)) + "</p></div>", { label: "すがた Lv" + lv });
   }
 
   // ---------- 声（仲良し度Lv3から） ----------
@@ -340,6 +401,7 @@
     A().openSheet('<div class="gk-rules"><h2>🪙 コインのため方</h2><ul>' +
       ["正解するたび +" + R.correct, "5問連続で正解 +" + R.c5 + "（ボーナス）", "10問連続で正解 +" + R.c10 + "（ボーナス）", "その日はじめて開いたとき +" + R.daily, "7日連続で開いたとき +" + R.week7, "翔太との週間勝負に勝つ +" + R.rivalWin].map((x) => "<li>" + esc(x) + "</li>").join("") +
       '</ul><h2>👗 きせかえ</h2><ul><li>ふつうの衣装（私服・夏服・冬服・ジャージ） 300</li><li>特別な衣装（浴衣・パーティー服・星の制服） 800</li><li>季節限定の衣装 1500</li><li>ガチャはなし。ほしい服を選んで交換できるよ</li></ul>' +
+      '<h2>✨ すがた</h2><ul><li>学習の単元を合格すると、カウントが増える</li><li>50 クリアごとに、すがたが 1 段階アップ</li><li>Lv10 は 450 クリア</li></ul>' +
       '<h2>💖 仲良し度</h2><ul><li>相棒といっしょに正解 +' + R.bondCorrect + "</li><li>10問連続で正解 +" + R.bondC10 + "</li><li>" + R.perLv + "ごとにレベルアップ（最高Lv" + R.maxLv + "）</li></ul>" +
       '<h2>🔥 翔太との週間勝負</h2><ul><li>月曜〜日曜の「最高連続正解」で勝負</li><li>今週の目標：連続正解 ' + rivalTarget() + " 問</li><li>勝つと +" + R.rivalWin + " コイン</li></ul></div>", { label: "コインのため方" });
   }
@@ -389,6 +451,8 @@
     else if (act === "story") storySheet(+b.dataset.ch);
     else if (act === "prof") profSheet(b.dataset.c);
     else if (act === "pick") { A().closeSheet(true); setPartner(b.dataset.c); }
+    else if (act === "look") lookSheet(b.dataset.c, +b.dataset.lv);
+    else if (act === "looklock") toastSafe("Lv" + b.dataset.lv + " は " + ((+b.dataset.lv - 1) * LOOK.per) + " クリアで");
     else if (act === "rules") rulesSheet();
     else if (act === "rival") rivalSheet();
     else if (act === "intro") intro();
@@ -426,6 +490,6 @@
   // 古い「なかま（もりっこ等）」の称号やきせかえの解放：仲良し度の最高レベルで決める
   function maxRank() { const lv = Math.max(1, ...CHARS.map((c) => lvOf(c.id))); return lv >= 10 ? 6 : lv >= 9 ? 5 : lv >= 7 ? 4 : lv >= 5 ? 3 : lv >= 3 ? 2 : lv >= 2 ? 1 : 0; }
 
-  window.HMGK = { CHARS, OUTFITS, R, TITLES, G, bal, partner, lvOf, bondOf, titleOf, skyLv, rivalTarget, rivalRec, weekKey, owned, wearing, inSeason,
-    homeHero, view, face, onAnswer, sumLine, afterRender, intro, greet, maxRank, buy, setPartner: (id) => setPartner(id), closeOverlay };
+  window.HMGK = { CHARS, OUTFITS, R, TITLES, LOOK, G, bal, partner, lvOf, bondOf, titleOf, skyLv, rivalTarget, rivalRec, weekKey, owned, wearing, inSeason,
+    passedSections, lookLv, lookName, lookProg, homeHero, view, face, onAnswer, sumLine, afterRender, intro, greet, maxRank, buy, setPartner: (id) => setPartner(id), closeOverlay };
 })();

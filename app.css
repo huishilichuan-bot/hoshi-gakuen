@@ -1087,7 +1087,7 @@ html.rmotion .mode-sel, html.rmotion .ms-slot { animation: none; }
 @keyframes updIn { from { opacity: 0; transform: translate(-50%, 20px); } }
 
 /* ===== v1.1.0 ほしの学園：相棒・学園の空・きせかえ ===== */
-.gk-hero { position: relative; height: 430px; margin: -6px -16px 12px; overflow: hidden; border-radius: 0 0 28px 28px; background: linear-gradient(180deg, #0b0a2a 0%, #1d1b5e 55%, #3b2f7f 100%); color: #fff; isolation: isolate; box-shadow: 0 12px 30px rgba(20,16,70,.28); }
+.gk-hero { position: relative; height: 468px; margin: -6px -16px 12px; overflow: hidden; border-radius: 0 0 28px 28px; background: linear-gradient(180deg, #0b0a2a 0%, #1d1b5e 55%, #3b2f7f 100%); color: #fff; isolation: isolate; box-shadow: 0 12px 30px rgba(20,16,70,.28); }
 .gk-hero.sky3, .gk-hero.sky4 { background: linear-gradient(180deg, #0e0d36 0%, #26237a 55%, #4a3b98 100%); }
 .gk-hero.sky5, .gk-hero.sky6 { background: linear-gradient(180deg, #121048 0%, #2f2c92 52%, #5d4bb0 100%); }
 .gk-hero.sky7, .gk-hero.sky8 { background: linear-gradient(180deg, #17145a 0%, #3a36a8 50%, #7a5fc8 100%); }
@@ -1111,7 +1111,7 @@ html.rmotion .mode-sel, html.rmotion .ms-slot { animation: none; }
 .gk-bub::after { content: ""; position: absolute; right: -8px; top: 22px; border: 8px solid transparent; border-left-color: #fff; border-right: 0; }
 .gk-bub.pop { animation: gkBubIn .45s cubic-bezier(.2,1.6,.4,1); }
 @keyframes gkBubIn { from { opacity: 0; transform: translateY(8px) scale(.92); } to { opacity: 1; transform: none; } }
-.gk-stand { position: absolute; right: 2%; bottom: 62px; width: 50%; height: 352px; border: 0; background: none; padding: 0; z-index: 2; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.gk-stand { position: absolute; right: 2%; bottom: 100px; width: 50%; height: 352px; border: 0; background: none; padding: 0; z-index: 2; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .gk-stage { position: relative; width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: center; }
 .gk-body { position: relative; z-index: 2; height: 100%; width: auto; max-width: 100%; object-fit: contain; filter: drop-shadow(0 6px 14px rgba(0,0,0,.35)); animation: gkBreath 4.2s ease-in-out infinite; transform-origin: 50% 100%; }
 @keyframes gkBreath { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-3px) scale(1.008); } }
@@ -1252,7 +1252,26 @@ html.rmotion .mode-sel, html.rmotion .ms-slot { animation: none; }
 .gk-stage.mini { width: 40%; height: 230px; flex: none; }
 .gk-in-dt { flex: 1; padding-bottom: 8px; } .gk-in-dt b { font-size: 18px; } .gk-in-dt small { display: block; opacity: .8; font-size: 12px; margin: 2px 0 8px; } .gk-in-dt p { margin: 0; font-size: 13.5px; line-height: 1.65; font-weight: 700; }
 .gk-in-hint { margin: 18px 0; text-align: center; opacity: .7; font-size: 14px; }
-@media (min-width: 700px) { .gk-hero { height: 470px; margin-left: 0; margin-right: 0; border-radius: 28px; } .gk-stand { height: 392px; width: 40%; right: 8%; } .gk-bub { width: 38%; left: 6%; top: 90px; font-size: 16px; } .gk-outfits { grid-template-columns: repeat(4, 1fr); } .gk-card-stage { height: 420px; } }
+
+.gk-look { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; align-items: center; gap: 3px 10px; margin-top: 4px; }
+.gk-look-h { grid-column: 1 / -1; font-size: 13px; letter-spacing: .02em; }
+.gk-look-h b { font-size: 16px; font-weight: 800; }
+.gk-look .gk-bar { height: 8px; }
+.gk-look small { font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.gk-card .gk-look, .gk-prof .gk-look { color: #2a2460; margin: 8px 0 2px; }
+.gk-card .gk-look small, .gk-prof .gk-look small { opacity: .9; }
+.gk-zukan { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 8px 0 18px; }
+.gk-zk { border: 0; background: #fff; border-radius: 14px; padding: 8px 4px 6px; box-shadow: 0 2px 8px rgba(20,16,70,.08); display: flex; flex-direction: column; align-items: center; gap: 2px; color: inherit; -webkit-tap-highlight-color: transparent; }
+.gk-zk img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; object-position: top; background: #eef; }
+.gk-zk.is-lock { opacity: .9; }
+.gk-zk.is-lock img.sil { filter: brightness(0); opacity: .32; }
+.gk-zk b { font-size: 11px; }
+.gk-zk small { font-size: 10px; opacity: .75; line-height: 1.2; min-height: 1.2em; text-align: center; }
+.gk-looksheet h2 { margin: 8px 0 0; font-size: 20px; }
+.gk-looksheet h2 b { font-weight: 800; }
+.gk-looksheet p { margin: 4px 0 0; font-size: 15px; }
+
+@media (min-width: 700px) { .gk-hero { height: 510px; margin-left: 0; margin-right: 0; border-radius: 28px; } .gk-stand { height: 392px; width: 40%; right: 8%; bottom: 108px; } .gk-bub { width: 38%; left: 6%; top: 90px; font-size: 16px; } .gk-outfits { grid-template-columns: repeat(4, 1fr); } .gk-card-stage { height: 420px; } }
 @media (prefers-reduced-motion: reduce) { .gk-body, .gk-aura, .gk-fx i, .gk-hearts i.on, .gk-shoot, .gk-sky .tw { animation: none !important; } }
 
 /* v1.1.2 漢字練習のステップ名：字の列は2行目に小さく */
