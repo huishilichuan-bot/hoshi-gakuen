@@ -1,7 +1,7 @@
 /* ほしの学園 — 勉強して⭐を集める学習アプリ（小1〜中3）。課金・お金の機能はありません。 */
 (() => {
   "use strict";
-  const VERSION = "1.3.0";
+  const VERSION = "1.4.0";
   // 記録はプロフィールごとに分けて保存：ゲスト＝"hoshigakuen"、アカウント＝"hoshigakuen:u:<uid>"（ログアウトで消す）
   const GUEST_KEY = "hoshigakuen";
   let KEY = GUEST_KEY;
@@ -72,7 +72,7 @@
   function fresh() {
     return { schema: SCHEMA, created: now(), settings: { sound: true, haptic: true, nick: "", vol: 0.8, bgm: true, bgmVol: 0.5, remind: false, remindAt: "17:00", fs: "m", rmotion: false, grade: 0, hint: true }, days: {}, totalStars: 0, pulls: 0, pullsUsed: 0,
       chars: { mori: { n: 1, shards: 0, star: 0, t: now() } }, partner: "mori", look: { bg: "note", maru: "red", title: "first" },
-      progress: {}, last: null, reports: [], gachaLog: [], games: {}, wrongBox: [], boxGone: {}, bossWins: {}, boxCleared: 0, bestCombo: 0, use: {}, gk: {}, tests: [] };
+      progress: {}, last: null, reports: [], gachaLog: [], games: {}, wrongBox: [], boxGone: {}, bossWins: {}, boxCleared: 0, bestCombo: 0, use: {}, gk: {}, tests: [], colorTests: {}, colorCoin: {}, kjWrong: [], kjBest: {}, kjCoin: {} };
   }
   function migrate(s) {
     if (!s || typeof s !== "object") return fresh();
@@ -498,7 +498,8 @@
     h += '<button type="button" class="mode-card prep" data-act="mode-prep"><span class="mc-ico">📗</span><b>予習</b><small>' + esc(prepSub) + "</small></button>";
     h += '<button type="button" class="mode-card test" data-act="mode-test"><span class="mc-ico">📝</span><b>テスト対策</b><small>' + esc(testSub) + "</small></button>";
     h += "</div>";
-    h += '<button type="button" class="marks-link" data-act="mode-marks">単元のようす ' + markLabel("ok", 90).replace("90%", "✅") + " " + "△ ❌ を見る</button>";
+    h += '<button type="button" class="marks-link" data-act="mode-marks">単元のようす ✅△❌ を見る</button>';
+    h += homeDrillHtml();
     return h;
   }
   function viewMode() {
@@ -509,6 +510,8 @@
     if (top.v === "test-new" || top.v === "test-edit") return { title: top.v === "test-edit" ? "テストを編集" : "テストを登録", html: viewTestForm() };
     if (top.v === "test-one") return { title: "テスト対策", html: viewTestOne(top.id) };
     if (top.v === "marks") return { title: "単元のようす", html: viewMarks() };
+    if (top.v === "color") return { title: "カラーテスト", html: viewColorHome() };
+    if (top.v === "kj") return { title: "漢字50問", html: viewKjHome() };
     return { title: "ほしの学園", html: "" };
   }
   function viewReview() {
@@ -628,6 +631,8 @@
     h += '<div class="chips wrap">' + [0].map(() => '<button type="button" class="chip' + (!g ? " on" : "") + '" data-act="marks-g" data-g="0">ぜんぶ</button>').join("") + [1, 2, 3, 4, 5, 6, 7, 8, 9].map((x) => '<button type="button" class="chip' + (x === g ? " on" : "") + '" data-act="marks-g" data-g="' + x + '">' + gradeName(x) + "</button>").join("") + "</div>";
     h += '<div class="chips wrap subj-chips">' + ['<button type="button" class="chip' + (!s ? " on" : "") + '" data-act="marks-s" data-s="">すべて</button>'].concat(SUBJ.map((x) => '<button type="button" class="chip' + (x.id === s ? " on" : "") + '" data-act="marks-s" data-s="' + x.id + '">' + esc(x.n) + "</button>")).join("") + "</div>";
     const recs = allUnitRecords().filter((r) => (!g || r.g === g) && (!s || r.s === s));
+    const rank = { ng: 0, mid: 1, "": 2, ok: 3 };
+    recs.sort((a, b) => (rank[a.mark] - rank[b.mark]) || (a.pct == null ? -1 : a.pct) - (b.pct == null ? -1 : b.pct) || a.un.localeCompare(b.un, "ja"));
     const nOk = recs.filter((r) => r.mark === "ok").length, nMid = recs.filter((r) => r.mark === "mid").length, nNg = recs.filter((r) => r.mark === "ng").length, nYet = recs.filter((r) => !r.mark).length;
     h += '<div class="mark-sum"><span>✅ ' + nOk + '</span><span>△ ' + nMid + '</span><span>❌ ' + nNg + '</span><span class="yet">まだ ' + nYet + "</span></div>";
     if (!recs.length) h += '<p class="lead soft">この条件の単元はないよ。</p>';
@@ -671,6 +676,490 @@
     if (Q.baseCorrect) { confetti(mark === "ok" ? 60 : 24); sound(mark === "ok" ? "fanfare" : "soft"); }
   }
 
+  // ---------- v1.4.0 カラーテスト・漢字50問 ----------
+  const CT_OMOTE_N = 10, CT_URA_N = 5, CT_OMOTE_PT = 5, CT_URA_PT = 10; // 10*5 + 5*10 = 100
+  const KJ_TEST_N = 50, KJ_READ_N = 25, KJ_WRITE_N = 25, KJ_PT = 2; // 50*2 = 100
+  const KJ_PRACTICE_N = 10;
+  let CT = null, KJ = null;
+  function drillPartner() {
+    return GCArt.charById(state.partner) || GCArt.charById((state.gk && state.gk.partner) || "") || { id: "ren", rarity: 0 };
+  }
+  function grantQuiet(okN) {
+    if (!okN) return 0;
+    const g = (state.gk = state.gk || {});
+    if (!g.coins || typeof g.coins !== "object") g.coins = { e: 0, s: 0 };
+    g.coins.e = (+g.coins.e || 0) + okN * 10;
+    g.correct = (+g.correct || 0) + okN;
+    if (!g.bond || typeof g.bond !== "object") g.bond = {};
+    if (g.partner) g.bond[g.partner] = (+g.bond[g.partner] || 0) + okN;
+    return okN * 10;
+  }
+  function colorKey(s, g, un) { return s + "|" + g + "|" + un; }
+  function colorRec(s, g, un) { const all = (state.colorTests = state.colorTests && typeof state.colorTests === "object" ? state.colorTests : {}); return all[colorKey(s, g, un)] || null; }
+  function jhsUnits(s, g) { return ((S()[s] || {})[g] || []).map((u, ui) => ({ s, g, ui, un: u.n, rec: unitRecord(s, g, ui), ct: colorRec(s, g, u.n) })).filter((x) => x.rec); }
+  function paperable(q) {
+    if (!q || q.listen || q.t === "kanji" || q.t === "ord" || q.t === "match" || q.t === "pair" || q.t === "tap" || q.t === "sp") return false;
+    return q.t === "ch" || q.t === "tf" || q.t === "num" || !q.t;
+  }
+  function collectColorQs(s, g, ui) {
+    const want = CT_OMOTE_N + CT_URA_N;
+    let pool = (collectScopeQuestions([{ s, g, ui }], 120) || []).filter(paperable);
+    const seen = new Set(pool.map((q) => q.q + "|" + q.a));
+    if (pool.length < want) {
+      const us = (S()[s] || {})[g] || [];
+      for (let i = 0; i < us.length && pool.length < want * 2; i++) {
+        if (i === ui) continue;
+        (collectScopeQuestions([{ s, g, ui: i }], 40) || []).filter(paperable).forEach((q) => {
+          const k = q.q + "|" + q.a; if (seen.has(k)) return; seen.add(k); pool.push(q);
+        });
+      }
+    }
+    pool = HM.U.shuf(pool);
+    const out = [];
+    const used = new Set();
+    for (let i = 0; i < pool.length && out.length < want; i++) {
+      const k = String(pool[i].q).slice(0, 80);
+      if (used.has(k)) continue; used.add(k); out.push(pool[i]);
+    }
+    return out;
+  }
+  function assignColorPts(qs) {
+    const nO = Math.min(CT_OMOTE_N, qs.length);
+    const nU = Math.min(CT_URA_N, Math.max(0, qs.length - nO));
+    const omote = qs.slice(0, nO).map((q) => Object.assign({}, q, { pts: CT_OMOTE_PT, side: "omote" }));
+    const ura = qs.slice(nO, nO + nU).map((q) => Object.assign({}, q, { pts: CT_URA_PT, side: "ura" }));
+    // 足りないときは配点を100に合わせる
+    const all = omote.concat(ura);
+    const sum = all.reduce((t, q) => t + q.pts, 0);
+    if (all.length && sum !== 100) {
+      const last = all[all.length - 1];
+      last.pts = Math.max(1, last.pts + (100 - sum));
+    }
+    return { omote, ura, all };
+  }
+  function gradeColorGiven(q, given) {
+    if (given == null || given === "") return { ok: false, empty: true };
+    if (q.t === "ch" || q.t === "tf") return { ok: given === q.a };
+    const j = judgeNum(given, q.a);
+    if (j.empty) return { ok: false, empty: true };
+    return { ok: !!(j.ok || j.reduce) };
+  }
+
+  function viewColorHome() {
+    const g0 = prepGrade() >= 7 ? prepGrade() : 7;
+    const top = modeNav[modeNav.length - 1] || {};
+    const g = top.g || g0, s = top.s || "math";
+    let h = '<p class="lead">中学の単元を、小学校のカラーテストみたいな 100 点満点でやってみよう。おもて 10 問（各 5 点）とうら 5 問（各 10 点）。</p>';
+    h += '<div class="chips wrap">' + [7, 8, 9].map((x) => '<button type="button" class="chip' + (x === g ? " on" : "") + '" data-act="ct-g" data-g="' + x + '">' + gradeName(x) + "</button>").join("") + "</div>";
+    const subjs = SUBJ.filter((x) => x.id !== "life" && gradesOf(x.id).includes(g));
+    h += '<div class="chips wrap">' + subjs.map((x) => '<button type="button" class="chip' + (x.id === s ? " on" : "") + '" data-act="ct-s" data-s="' + x.id + '">' + esc(subjName(x.id, g)) + "</button>").join("") + "</div>";
+    const list = jhsUnits(s, g);
+    if (!list.length) h += '<p class="lead soft">この教科・学年の単元はないよ。</p>';
+    else h += '<div class="list">' + list.map((r) => {
+      const sc = r.ct ? '<span class="umark ' + markOf(r.ct.best) + '">' + r.ct.best + "点</span>" : '<span class="umark none">まだ</span>';
+      return '<button type="button" class="row-btn unit-row" data-act="ct-start" data-s="' + r.s + '" data-g="' + r.g + '" data-ui="' + r.ui + '">' + HMIcons.icon(r.s, subjById(r.s).c, 36) + '<span class="grow"><b>' + esc(r.un) + "</b><span class=\"small muted\">単元テスト 100点満点" + (r.ct ? " ・ ベスト " + r.ct.best + "点" : "") + "</span></span>" + sc + "</button>";
+    }).join("") + "</div>";
+    return h;
+  }
+
+  function startColorTest(s, g, ui) {
+    const u = ((S()[s] || {})[g] || [])[ui]; if (!u) { toast("単元が見つからないよ"); return; }
+    const raw = collectColorQs(s, g, ui);
+    if (raw.length < 6) { toast("この単元では、まだテスト用の問題が足りないよ"); return; }
+    const pack = assignColorPts(raw);
+    CT = { s, g, ui, un: u.n, omote: pack.omote, ura: pack.ura, all: pack.all, ans: {}, side: "omote", graded: false, score: 0, coins: 0, extra: raw.length > (S()[s][g][ui].steps ? 0 : 0) && pack.all.some((q) => q.__src && q.__src.ui !== ui) };
+    Q = { mode: "color", s, g, ui: null, backNav: [{ v: "color", s, g }] };
+    $("#quiz").hidden = false; document.body.classList.add("in-quiz");
+    renderColorCover();
+  }
+  function colorMax(ct) { return (ct.omote.reduce((t, q) => t + q.pts, 0) + ct.ura.reduce((t, q) => t + q.pts, 0)); }
+  function renderColorCover() {
+    const ct = CT, p = drillPartner();
+    const max = colorMax(ct);
+    let h = '<div class="ct-cover"><div class="ct-seal">ほしの学園</div><div class="ct-kicker">単元テスト</div>';
+    h += "<h2>" + esc(subjName(ct.s, ct.g)) + " " + gradeName(ct.g) + "</h2><div class=\"ct-unit\">" + esc(ct.un) + "</div>";
+    h += '<div class="ct-pts"><b>' + max + " 点満点</b><span>おもて " + ct.omote.length + " 問（各 " + CT_OMOTE_PT + " 点）＝ " + ct.omote.reduce((t, q) => t + q.pts, 0) + " 点</span><span>うら " + ct.ura.length + " 問（各 " + CT_URA_PT + " 点）＝ " + ct.ura.reduce((t, q) => t + q.pts, 0) + " 点</span></div>";
+    if (ct.extra) h += '<p class="small">同じ学年の、ちかい単元の問題もすこし入っているよ。</p>';
+    h += '<div class="sum-char">' + charHtml(p.id, 100, "bob r" + p.rarity) + '<div class="bubble">表と裏、両方やってから採点しよう！</div></div>';
+    h += '<div class="sum-act"><button type="button" class="btn primary block" data-ct="open">おもてをひらく</button><button type="button" class="btn ghost block" data-q="quit">もどる</button></div></div>';
+    $("#quiz").innerHTML = h; $("#quiz").scrollTop = 0;
+  }
+  function qPrompt(q) { return fracHtml(q.q || ""); }
+  function renderColorPaper() {
+    const ct = CT, side = ct.side, list = side === "omote" ? ct.omote : ct.ura, start = side === "omote" ? 0 : ct.omote.length;
+    const max = colorMax(ct), nick = (state.settings && state.settings.nick) || "";
+    let h = '<div class="ct-sheet ' + (ct.graded ? "graded" : "") + ' side-' + side + '">';
+    h += '<div class="ct-bar"><button type="button" class="ct-x" data-q="quit" aria-label="やめる">✕</button>';
+    h += '<div class="ct-flip"><button type="button" class="ct-tab' + (side === "omote" ? " on" : "") + '" data-ct="side" data-side="omote">おもて</button><button type="button" class="ct-tab' + (side === "ura" ? " on" : "") + '" data-ct="side" data-side="ura">うら</button></div>';
+    h += (ct.graded ? '<div class="ct-live">' + ct.score + " / " + max + "</div>" : "") + "</div>";
+    h += '<div class="ct-paper"><div class="ct-head"><div class="ct-brand">ほしの学園　単元テスト</div><div class="ct-meta">' + esc(subjName(ct.s, ct.g) + "　" + gradeName(ct.g)) + "</div>";
+    h += '<div class="ct-title">' + esc(ct.un) + "</div>";
+    h += '<div class="ct-row"><span class="ct-name">なまえ <i>' + esc(nick) + '</i></span><span class="ct-scorebox">得点 <b>' + (ct.graded ? ct.score : "") + "</b> / " + max + "</span></div>";
+    h += '<div class="ct-rule">この面　' + (side === "omote" ? "おもて　" + ct.omote.length + " 問（各 " + CT_OMOTE_PT + " 点）" : "うら　" + ct.ura.length + " 問（各 " + CT_URA_PT + " 点）") + "</div></div>";
+    list.forEach((q, i) => {
+      const idx = start + i, given = ct.ans[idx], res = ct.graded ? gradeColorGiven(q, given) : null;
+      h += '<div class="ct-q' + (res ? (res.ok ? " ok" : " ng") : "") + '"><div class="ct-qn"><span class="ct-no">' + (idx + 1) + '</span><span class="ct-pt">' + q.pts + "点</span></div>";
+      h += '<div class="ct-qp">' + qPrompt(q) + "</div>";
+      if (q.t === "ch" || q.t === "tf") {
+        const opts = q.opts || (q.t === "tf" ? ["〇", "×"] : [q.a].concat(q.o || []));
+        h += '<div class="ct-opts">';
+        opts.forEach((o) => {
+          const on = given === o;
+          h += '<button type="button" class="ct-opt' + (on ? " on" : "") + (ct.graded && o === q.a ? " right" : "") + (ct.graded && on && o !== q.a ? " wrong" : "") + '" data-ct="pick" data-i="' + idx + '" data-v="' + esc(o) + '" ' + (ct.graded ? "disabled" : "") + ">" + fracHtml(esc(o)) + "</button>";
+        });
+        h += "</div>";
+      } else {
+        h += '<div class="ct-num"><input class="ct-in" data-ct-in="' + idx + '" inputmode="decimal" autocomplete="off" value="' + esc(given || "") + '" ' + (ct.graded ? "readonly" : "") + ' placeholder="こたえ"></div>';
+        if (ct.graded) h += '<div class="ct-ans">正解　' + esc(q.a) + "</div>";
+      }
+      if (res) h += '<i class="ct-mark">' + (res.ok ? "◯" : "／") + "</i>";
+      h += "</div>";
+    });
+    h += "</div>";
+    if (!ct.graded) {
+      h += '<div class="ct-foot"><button type="button" class="btn ghost" data-ct="side" data-side="' + (side === "omote" ? "ura" : "omote") + '">' + (side === "omote" ? "うらを見る →" : "← おもてに戻る") + '</button><button type="button" class="btn primary" data-ct="grade">採点する（100点満点）</button></div>';
+    } else {
+      h += '<div class="ct-foot"><button type="button" class="btn ghost" data-ct="side" data-side="' + (side === "omote" ? "ura" : "omote") + '">' + (side === "omote" ? "うらを見る →" : "← おもてを見る") + '</button><button type="button" class="btn primary" data-ct="result">結果を見る</button></div>';
+    }
+    h += "</div>";
+    $("#quiz").innerHTML = h; $("#quiz").scrollTop = 0;
+    if (!ct.graded) {
+      $$("[data-ct-in]").forEach((inp) => { inp.addEventListener("input", () => { CT.ans[+inp.getAttribute("data-ct-in")] = inp.value; }); inp.addEventListener("change", () => { CT.ans[+inp.getAttribute("data-ct-in")] = inp.value; }); });
+    }
+  }
+  function readColorInputs() { $$("[data-ct-in]").forEach((inp) => { CT.ans[+inp.getAttribute("data-ct-in")] = inp.value; }); }
+  function gradeColorTest() {
+    readColorInputs();
+    const ct = CT, max = colorMax(ct);
+    let score = 0, okN = 0, blank = 0;
+    ct.all.forEach((q, i) => {
+      const r = gradeColorGiven(q, ct.ans[i]);
+      if (r.empty) blank++;
+      if (r.ok) { score += q.pts; okN++; }
+    });
+    ct.graded = true; ct.score = score; ct.okN = okN; ct.blank = blank;
+    const day = today(), k = colorKey(ct.s, ct.g, ct.un);
+    const all = (state.colorTests = state.colorTests || {});
+    const prev = all[k] || { best: 0, plays: 0 };
+    const rec = { best: Math.max(prev.best || 0, score), last: score, plays: (prev.plays || 0) + 1, t: now(), n: ct.all.length, max };
+    all[k] = rec;
+    // コイン・仲良し度：その単元は1日1回、正解1問につき10（通常と同じ）
+    const ck = (state.colorCoin = state.colorCoin || {});
+    const dayK = k + "|" + day;
+    let coins = 0;
+    if (!ck[dayK] && okN) { ck[dayK] = 1; coins = grantQuiet(okN); }
+    ct.coins = coins;
+    save();
+    renderColorResult();
+  }
+  function renderColorResult() {
+    const ct = CT, max = colorMax(ct), pct = Math.round(100 * ct.score / max), mark = markOf(pct);
+    const omote = ct.omote.reduce((t, q, i) => t + (gradeColorGiven(q, ct.ans[i]).ok ? q.pts : 0), 0);
+    const uraOff = ct.omote.length;
+    const ura = ct.ura.reduce((t, q, i) => t + (gradeColorGiven(q, ct.ans[uraOff + i]).ok ? q.pts : 0), 0);
+    const omoteMax = ct.omote.reduce((t, q) => t + q.pts, 0), uraMax = ct.ura.reduce((t, q) => t + q.pts, 0);
+    const p = drillPartner();
+    const line = pct >= 100 ? "100点！ 花丸だね！" : pct >= 90 ? "すばらしい！ 花丸だよ！" : pct >= 60 ? "いい調子！ もう一度やると、もっと伸びるよ。" : "ここから伸びるよ。範囲の単元を復習してみよう！";
+    let h = '<div class="ct-result">';
+    if (pct >= 90) h += '<div class="ct-hana' + (pct >= 100 ? " perfect" : "") + '"><span>花丸</span></div>';
+    h += '<div class="ct-score-hero"><div class="ct-sh-k">単元テストの結果</div><div class="ct-sh-n"><b>' + ct.score + "</b><small> / " + max + " 点</small></div>" + markLabel(mark, pct) + "</div>";
+    h += '<div class="ct-break"><div><b>おもて</b><span>' + omote + " / " + omoteMax + " 点</span></div><div><b>うら</b><span>" + ura + " / " + uraMax + " 点</span></div><div><b>正解</b><span>" + ct.okN + " / " + ct.all.length + " 問</span></div></div>";
+    if (ct.coins) h += '<p class="ct-coin">🪙 +' + ct.coins + " コイン（今日この単元の1回目）</p>";
+    h += '<div class="sum-char">' + charHtml(p.id, 100, "bob r" + p.rarity) + '<div class="bubble">' + esc(line) + "</div></div>";
+    h += '<div class="sum-act"><button type="button" class="btn primary block" data-ct="review">赤ペンの答案を見る</button><button type="button" class="btn ghost block" data-ct="again">もう一度受ける</button><button type="button" class="btn ghost block" data-q="quit">もどる</button></div></div>';
+    $("#quiz").innerHTML = h; $("#quiz").scrollTop = 0;
+    if (pct >= 90) { confetti(pct >= 100 ? 80 : 50); sound("fanfare"); } else if (ct.score) sound("soft");
+  }
+  function handleColor(act, el) {
+    if (!CT) return false;
+    if (act === "open") { CT.side = "omote"; renderColorPaper(); return true; }
+    if (act === "side") { readColorInputs(); CT.side = el.dataset.side; renderColorPaper(); return true; }
+    if (act === "pick") {
+      if (CT.graded) return true;
+      CT.ans[+el.dataset.i] = el.dataset.v;
+      const box = el.closest(".ct-q");
+      if (box) box.querySelectorAll(".ct-opt").forEach((b) => b.classList.toggle("on", b === el));
+      else renderColorPaper();
+      return true;
+    }
+    if (act === "grade") { gradeColorTest(); return true; }
+    if (act === "result") { renderColorResult(); return true; }
+    if (act === "review") { CT.side = "omote"; renderColorPaper(); return true; }
+    if (act === "again") { startColorTest(CT.s, CT.g, CT.ui); return true; }
+    return false;
+  }
+
+  // ---- 漢字 ----
+  function kjGrade() { const g = prepGrade(); return g >= 7 && g <= 9 ? g : 7; }
+  function kjList(g) { return (HM.KANJI_ENT && HM.KANJI_ENT[g]) || []; }
+  function kjWrongArr() { if (!Array.isArray(state.kjWrong)) state.kjWrong = []; return state.kjWrong; }
+  function kjBestOf(g) { const all = (state.kjBest = state.kjBest && typeof state.kjBest === "object" ? state.kjBest : {}); return all[String(g)] || null; }
+  function kanaOnly(s) { return String(s || "").replace(/[ぁ-ん]/g, (c) => c).trim(); }
+  function kjWordHtml(w, hideI) {
+    if (!w) return "";
+    const parts = Array.isArray(w.f) && w.f.length ? w.f : [[w.t || w.k || "", w.r || ""]];
+    return '<span class="kjq big">' + parts.map((part, j) => {
+      const ru = Array.isArray(part) ? part[0] : (part && part.ru) || "";
+      const rt = Array.isArray(part) ? part[1] : (part && part.rt) || "";
+      if (hideI && j === w.i) return "<ruby><span class=\"kj-box\"></span><rt>" + esc(rt) + "</rt></ruby>";
+      return esc(ru);
+    }).join("") + "</span>";
+  }
+  function pickKjQs(g, kind, n, preferWrong) {
+    const list = kjList(g);
+    const wrong = kjWrongArr().filter((x) => x.g === g && (!kind || x.kind === kind));
+    const pool = [];
+    const use = preferWrong && wrong.length ? wrong : [];
+    const pushEnt = (e, wkind) => {
+      if (!e || !e.words || !e.words.length) return;
+      const w = e.words[Math.floor(Math.random() * e.words.length)] || e.words[0];
+      pool.push({ kind: wkind, k: e.k, sc: e.sc, g, w });
+    };
+    if (use.length) {
+      use.forEach((x) => {
+        const e = list.find((it) => it.k === x.k) || { k: x.k, sc: x.sc || 0, words: x.w ? [x.w] : [] };
+        if (!e.words.length && x.w) e.words = [x.w];
+        pushEnt(e, x.kind || kind || "read");
+      });
+    }
+    const shuf = HM.U.shuf(list.slice());
+    shuf.forEach((e) => { if (pool.length >= n * 2) return; if (pool.some((p) => p.k === e.k && p.kind === (kind || p.kind))) return; pushEnt(e, kind || (pool.length % 2 ? "write" : "read")); });
+    let out = HM.U.shuf(pool);
+    if (kind) out = out.filter((q) => q.kind === kind);
+    const uniq = []; const seen = new Set();
+    out.forEach((q) => { const id = q.kind + ":" + q.k + ":" + q.w.t; if (seen.has(id)) return; seen.add(id); uniq.push(q); });
+    return uniq.slice(0, n);
+  }
+  function kjReadOpts(q, g) {
+    const correct = q.w.r;
+    const pool = [];
+    const list = kjList(g);
+    list.forEach((e) => (e.words || []).forEach((w) => { if (w && w.r && w.r !== correct && pool.indexOf(w.r) < 0) pool.push(w.r); }));
+    const opts = [correct].concat(HM.U.shuf(pool).slice(0, 3));
+    while (opts.length < 4) opts.push(correct + "ん"); // should almost never happen
+    return HM.U.shuf(Array.from(new Set(opts))).slice(0, 4);
+  }
+  function viewKjHome() {
+    const top = modeNav[modeNav.length - 1] || {};
+    const g = top.g || kjGrade();
+    const n = kjList(g).length, best = kjBestOf(g), wrong = kjWrongArr().filter((x) => x.g === g).length;
+    let h = '<p class="lead">中学の常用漢字。「読み 25 問 ＋ 書き 25 問」の 50 問テストは 100 点満点（1問 2 点）。</p>';
+    h += '<div class="chips wrap">' + [7, 8, 9].map((x) => '<button type="button" class="chip' + (x === g ? " on" : "") + '" data-act="kj-g" data-g="' + x + '">' + gradeName(x) + "</button>").join("") + "</div>";
+    h += '<div class="kj-hero-card"><div class="kj-hk">' + gradeName(g) + "の漢字</div><b>" + n + " 字</b><small>常用漢字を学年別に分けたもの</small>";
+    if (best) h += '<div class="kj-best">50問のベスト　' + best.score + " / 100 点 " + markIcon(markOf(best.score)) + "</div>";
+    h += "</div>";
+    h += '<div class="drill-acts">';
+    h += '<button type="button" class="btn primary block" data-act="kj-start" data-mode="test50" data-g="' + g + '">📝 50問テスト（読み25・書き25・100点）</button>';
+    h += '<button type="button" class="btn block" data-act="kj-start" data-mode="read" data-g="' + g + '">📖 読みの練習（10問）</button>';
+    h += '<button type="button" class="btn block" data-act="kj-start" data-mode="write" data-g="' + g + '">✍️ 書きの練習（10問）</button>';
+    if (wrong) h += '<button type="button" class="btn block" data-act="kj-start" data-mode="retry" data-g="' + g + '">🔁 まちがえた漢字のやり直し（' + wrong + "）</button>";
+    h += "</div>";
+    h += '<p class="small muted">書きは指で書いて、答えを見て自分で ⭕❌ をつけるよ。読みは 4 つのなかからえらぶよ。</p>';
+    return h;
+  }
+  function startKj(mode, g) {
+    g = +g;
+    const kind = mode === "read" || mode === "write" ? mode : null;
+    const prefer = mode === "retry";
+    let n = mode === "test50" ? KJ_TEST_N : KJ_PRACTICE_N;
+    let qs;
+    if (mode === "test50") {
+      const r = pickKjQs(g, "read", KJ_READ_N, false);
+      const w = pickKjQs(g, "write", KJ_WRITE_N, false).filter((q) => !r.some((x) => x.k === q.k));
+      // fill write if filter shrunk it
+      if (w.length < KJ_WRITE_N) pickKjQs(g, "write", KJ_WRITE_N * 2, false).forEach((q) => { if (w.length < KJ_WRITE_N && !w.some((x) => x.k === q.k)) w.push(q); });
+      qs = r.slice(0, KJ_READ_N).concat(w.slice(0, KJ_WRITE_N));
+      // if still short, allow overlap
+      if (qs.length < KJ_TEST_N) qs = pickKjQs(g, "read", KJ_READ_N, false).concat(pickKjQs(g, "write", KJ_WRITE_N, false)).slice(0, KJ_TEST_N);
+    } else if (mode === "retry") {
+      qs = pickKjQs(g, null, Math.min(20, Math.max(1, kjWrongArr().filter((x) => x.g === g).length || 10)), true);
+      if (!qs.length) { toast("やり直しリストはからっぽだよ"); return; }
+    } else qs = pickKjQs(g, kind, n, false);
+    if (!qs.length) { toast("この学年の漢字データがないよ"); return; }
+    qs.forEach((q) => { if (q.kind === "read") q.opts = kjReadOpts(q, g); q.pts = mode === "test50" ? KJ_PT : 10; });
+    // practice 10問 = 各10点で100点、テスト50問 = 各2点で100点
+    if (mode !== "test50") { const pt = Math.round(100 / qs.length); qs.forEach((q, i) => { q.pts = i === qs.length - 1 ? 100 - pt * (qs.length - 1) : pt; }); }
+    KJ = { mode, g, qs, i: 0, results: [], revealed: false, self: null, score: 0, coins: 0 };
+    Q = { mode: "kj50", s: "ja", g, ui: null, backNav: [{ v: "kj", g }] };
+    $("#quiz").hidden = false; document.body.classList.add("in-quiz");
+    if (mode === "test50") renderKjCover(); else renderKjQ();
+  }
+  function renderKjCover() {
+    const kj = KJ, p = drillPartner();
+    let h = '<div class="kj-cover"><div class="ct-seal">ほしの学園</div><div class="ct-kicker">漢字 50 問テスト</div>';
+    h += "<h2>" + gradeName(kj.g) + "</h2>";
+    h += '<div class="ct-pts"><b>100 点満点</b><span>読み 25 問（各 2 点）＝ 50 点</span><span>書き 25 問（各 2 点）＝ 50 点</span><span>全 ' + kj.qs.length + " 問</span></div>";
+    h += '<p class="small">書きは指で書いたあと、答えを見て自分で ⭕❌ をつけるよ。</p>';
+    h += '<div class="sum-char">' + charHtml(p.id, 100, "bob r" + p.rarity) + '<div class="bubble">50 問、いってみよう！</div></div>';
+    h += '<div class="sum-act"><button type="button" class="btn primary block" data-kj="go">はじめる</button><button type="button" class="btn ghost block" data-q="quit">もどる</button></div></div>';
+    $("#quiz").innerHTML = h; $("#quiz").scrollTop = 0;
+  }
+  function renderKjQ() {
+    const kj = KJ, q = kj.qs[kj.i], n = kj.qs.length;
+    let h = '<div class="kj50"><div class="ct-bar"><button type="button" class="ct-x" data-q="quit" aria-label="やめる">✕</button><div class="qz-prog"><i style="width:' + Math.round((kj.i / n) * 100) + '%"></i></div><span class="qz-n num">' + (kj.i + 1) + "/" + n + "</span></div>";
+    h += '<div class="kj50-body">';
+    h += '<div class="kj50-kind">' + (q.kind === "read" ? "読み" : "書き") + "　" + q.pts + "点</div>";
+    if (q.kind === "read") {
+      h += '<p class="kj50-q">このことばの読みはどれ？</p>';
+      h += '<div class="kj50-word">' + esc(q.w.t) + "</div>";
+      h += '<div class="ct-opts">';
+      (q.opts || []).forEach((o) => {
+        const on = kj.pick === o;
+        const show = kj.revealed;
+        h += '<button type="button" class="ct-opt' + (on ? " on" : "") + (show && o === q.w.r ? " right" : "") + (show && on && o !== q.w.r ? " wrong" : "") + '" data-kj="pick" data-v="' + esc(o) + '">' + esc(o) + "</button>";
+      });
+      h += "</div>";
+      if (!kj.revealed) h += '<button type="button" class="btn primary block" data-kj="lock">こたえる</button>';
+      else h += '<div class="kj50-fb">' + (kj.pick === q.w.r ? "⭕ 正解" : "正解は「" + esc(q.w.r) + "」") + '</div><button type="button" class="btn primary block" data-kj="next">次へ</button>';
+    } else {
+      h += '<p class="kj50-q">□ に入る漢字を、指で書こう</p>';
+      h += '<div class="kj50-word">' + kjWordHtml(q.w, true) + "</div>";
+      h += '<p class="small muted center">「' + esc(q.w.t) + "（" + esc(q.w.r) + "）」　" + (q.sc ? q.sc + "画" : "") + "</p>";
+      h += '<div class="kj-pad kj50-pad"><canvas class="kj-cv" id="kj50-cv"></canvas></div>';
+      h += '<div class="kj-tools"><button type="button" class="kj-b" data-kj="undo">↩︎ 1画もどす</button><button type="button" class="kj-b" data-kj="clear">🧽 けす</button></div>';
+      if (!kj.revealed) h += '<button type="button" class="btn primary block" data-kj="reveal">答えを見る</button>';
+      else {
+        h += '<div class="kj50-ans">正解　<span class="kj50-char">' + esc(q.k) + "</span></div>";
+        if (kj.self == null) h += '<p class="lead">書けていたかな？ 自分でつけよう</p><div class="actions two"><button type="button" class="btn primary" data-kj="self" data-ok="1">⭕ 書けた</button><button type="button" class="btn" data-kj="self" data-ok="0">❌ ちがう</button></div>';
+        else h += '<div class="kj50-fb">' + (kj.self ? "⭕ 書けた" : "❌ やり直しリストに入れるね") + '</div><button type="button" class="btn primary block" data-kj="next">次へ</button>';
+      }
+    }
+    h += "</div></div>";
+    $("#quiz").innerHTML = h; $("#quiz").scrollTop = 0;
+    if (q.kind === "write") mountKjPad();
+  }
+  function mountKjPad() {
+    const cv = $("#kj50-cv"); if (!cv) return;
+    const pad = cv.parentElement;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    let strokes = Array.isArray(KJ._strokes) ? KJ._strokes : [], cur = null;
+    cv.style.touchAction = "none";
+    function size() {
+      const r = pad.getBoundingClientRect(), w = Math.max(180, r.width), h = Math.max(180, r.height || w);
+      cv.width = w * dpr; cv.height = h * dpr; cv.style.width = w + "px"; cv.style.height = h + "px";
+      draw();
+    }
+    function draw() {
+      const ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+      ctx.clearRect(0, 0, W, H);
+      ctx.save(); ctx.scale(dpr, dpr);
+      const w = cv.width / dpr, h = cv.height / dpr;
+      ctx.fillStyle = "#fffdf7"; ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = "rgba(196,30,58,.28)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(w / 2, 8); ctx.lineTo(w / 2, h - 8); ctx.moveTo(8, h / 2); ctx.lineTo(w - 8, h / 2); ctx.stroke();
+      ctx.strokeStyle = "#1a1a1a"; ctx.lineWidth = 5; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      strokes.forEach((s) => { if (!s || !s.length || !s[0]) return; ctx.beginPath(); ctx.moveTo(s[0][0], s[0][1]); for (let i = 1; i < s.length; i++) if (s[i]) ctx.lineTo(s[i][0], s[i][1]); ctx.stroke(); });
+      ctx.restore();
+    }
+    function pt(e) {
+      const r = cv.getBoundingClientRect();
+      const t = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]) || e;
+      if (!t || t.clientX == null || !r.width || !r.height) return null;
+      return [(t.clientX - r.left) * (cv.width / dpr) / r.width, (t.clientY - r.top) * (cv.height / dpr) / r.height];
+    }
+    const down = (e) => { if (!KJ || KJ.revealed) return; e.preventDefault(); const p = pt(e); if (!p) return; cur = [p]; strokes.push(cur); KJ._strokes = strokes; };
+    const move = (e) => { if (!cur) return; e.preventDefault(); const p = pt(e); if (!p) return; cur.push(p); KJ._strokes = strokes; draw(); };
+    const up = () => { cur = null; };
+    cv.addEventListener("pointerdown", down); cv.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+    KJ._pad = { undo: () => { strokes.pop(); KJ._strokes = strokes; draw(); }, clear: () => { strokes = []; KJ._strokes = strokes; draw(); }, cleanup: () => { window.removeEventListener("pointerup", up); } };
+    size();
+  }
+  function kjAddWrong(q) {
+    const arr = kjWrongArr();
+    if (arr.some((x) => x.g === q.g && x.k === q.k && x.kind === q.kind)) return;
+    arr.unshift({ g: q.g, k: q.k, kind: q.kind, w: q.w, sc: q.sc, t: now() });
+    if (arr.length > 150) arr.length = 150;
+  }
+  function kjRemoveWrong(q) {
+    state.kjWrong = kjWrongArr().filter((x) => !(x.g === q.g && x.k === q.k && x.kind === q.kind));
+  }
+  function kjCommit(ok) {
+    const kj = KJ, q = kj.qs[kj.i];
+    kj.results.push({ q, ok });
+    if (ok) { kj.score += q.pts; kjRemoveWrong(q); }
+    else kjAddWrong(q);
+    kj.revealed = false; kj.pick = null; kj.self = null; kj._strokes = null;
+    if (kj._pad && kj._pad.cleanup) kj._pad.cleanup();
+    kj.i++;
+    if (kj.i >= kj.qs.length) renderKjResult();
+    else renderKjQ();
+  }
+  function renderKjResult() {
+    const kj = KJ, max = 100, pct = kj.score, mark = markOf(pct);
+    const readQs = kj.qs.filter((q) => q.kind === "read"), writeQs = kj.qs.filter((q) => q.kind === "write");
+    const readOk = kj.results.filter((r) => r.q.kind === "read" && r.ok).length;
+    const writeOk = kj.results.filter((r) => r.q.kind === "write" && r.ok).length;
+    const p = drillPartner();
+    const title = kj.mode === "test50" ? "漢字 50 問テスト" : kj.mode === "retry" ? "やり直し" : (kj.mode === "read" ? "読みの練習" : "書きの練習");
+    if (kj.mode === "test50") {
+      const all = (state.kjBest = state.kjBest || {});
+      const prev = all[String(kj.g)] || { best: 0 };
+      all[String(kj.g)] = { best: Math.max(prev.best || 0, kj.score), last: kj.score, t: now(), n: kj.qs.length };
+    }
+    const ck = (state.kjCoin = state.kjCoin || {});
+    const dayK = kj.g + "|" + kj.mode + "|" + today();
+    const okN = kj.results.filter((r) => r.ok).length;
+    let coins = 0;
+    if (!ck[dayK] && okN) { ck[dayK] = 1; coins = grantQuiet(okN); }
+    kj.coins = coins;
+    save();
+    const line = pct >= 90 ? "花丸！ この調子だよ！" : pct >= 60 ? "いい感じ！ まちがえた字はやり直しリストに入っているよ。" : "だいじょうぶ。やり直しリストから、もう一度書いてみよう！";
+    let h = '<div class="ct-result kj-result">';
+    if (pct >= 90) h += '<div class="ct-hana' + (pct >= 100 ? " perfect" : "") + '"><span>花丸</span></div>';
+    h += '<div class="ct-score-hero"><div class="ct-sh-k">' + esc(title) + "　" + gradeName(kj.g) + '</div><div class="ct-sh-n"><b>' + kj.score + "</b><small> / " + max + " 点</small></div>" + markLabel(mark, pct) + "</div>";
+    h += '<div class="ct-break">';
+    if (readQs.length) h += "<div><b>読み</b><span>" + readOk + " / " + readQs.length + " 問</span></div>";
+    if (writeQs.length) h += "<div><b>書き</b><span>" + writeOk + " / " + writeQs.length + " 問</span></div>";
+    h += "<div><b>正解</b><span>" + okN + " / " + kj.qs.length + " 問</span></div></div>";
+    if (coins) h += '<p class="ct-coin">🪙 +' + coins + " コイン（今日このメニューの1回目）</p>";
+    h += '<div class="sum-char">' + charHtml(p.id, 100, "bob r" + p.rarity) + '<div class="bubble">' + esc(line) + "</div></div>";
+    h += '<div class="sum-act"><button type="button" class="btn primary block" data-kj="again">もう一度</button><button type="button" class="btn ghost block" data-q="quit">もどる</button></div>';
+    const miss = kj.results.filter((r) => !r.ok);
+    if (miss.length) {
+      h += '<div class="sec2">もう一度やりたい漢字</div><div class="kj-miss">';
+      miss.forEach((r) => { h += '<span class="kj-m">' + esc(r.q.k) + "<small>" + (r.q.kind === "read" ? "読み" : "書き") + "</small></span>"; });
+      h += "</div>";
+    }
+    h += "</div>";
+    $("#quiz").innerHTML = h; $("#quiz").scrollTop = 0;
+    if (pct >= 90) { confetti(pct >= 100 ? 80 : 50); sound("fanfare"); } else if (kj.score) sound("soft");
+  }
+  function handleKj(act, el) {
+    if (!KJ) return false;
+    if (act === "go") { renderKjQ(); return true; }
+    if (act === "pick") { if (KJ.revealed) return true; KJ.pick = el.dataset.v; renderKjQ(); return true; }
+    if (act === "lock") { if (!KJ.pick) { toast("読みをえらんでね"); return true; } KJ.revealed = true; renderKjQ(); return true; }
+    if (act === "reveal") { KJ.revealed = true; renderKjQ(); return true; }
+    if (act === "self") { KJ.self = el.dataset.ok === "1"; renderKjQ(); return true; }
+    if (act === "next") {
+      const q = KJ.qs[KJ.i];
+      if (q.kind === "read") kjCommit(KJ.pick === q.w.r);
+      else kjCommit(!!KJ.self);
+      return true;
+    }
+    if (act === "undo") { if (KJ._pad) KJ._pad.undo(); return true; }
+    if (act === "clear") { if (KJ._pad) KJ._pad.clear(); return true; }
+    if (act === "again") { startKj(KJ.mode, KJ.g); return true; }
+    return false;
+  }
+
+  function colorCardSub() {
+    const g = prepGrade() >= 7 ? prepGrade() : 7;
+    const recs = Object.values(state.colorTests || {});
+    if (recs.length) { const b = recs.slice().sort((a, b) => (b.t || 0) - (a.t || 0))[0]; return "ベスト " + Math.max.apply(null, recs.map((r) => r.best || 0)) + "点"; }
+    return "中学の単元　100点満点";
+  }
+  function kjCardSub() {
+    const g = kjGrade(), b = kjBestOf(g);
+    return b ? gradeName(g) + " ベスト " + b.best + "点" : gradeName(g) + "　読みと書き　50問";
+  }
+  function homeDrillHtml() {
+    return '<div class="drill2">' +
+      '<button type="button" class="drill-card color" data-act="mode-color"><span class="mc-ico">🖍️</span><b>カラーテスト</b><small>' + esc(colorCardSub()) + "</small></button>" +
+      '<button type="button" class="drill-card kj" data-act="mode-kj"><span class="mc-ico">🈶</span><b>漢字50問</b><small>' + esc(kjCardSub()) + "</small></button>" +
+      "</div>";
+  }
+
   // 勉強タブ
   function viewStudy() {
     const top = nav[nav.length - 1];
@@ -683,7 +1172,7 @@
     }
     if (top.v === "units") {
       const us = S()[top.s][top.g];
-      return { title: subjName(top.s, top.g) + " " + gradeName(top.g), html: '<p class="lead">単元をえらぼう</p>' + markLegend() + '<div class="list">' + us.map((u, ui) => { const r = unitStats(top.s, top.g, ui); const mk = unitRecord(top.s, top.g, ui); return '<button type="button" class="row-btn unit-row" data-unit="' + ui + '"><span class="un">' + (ui + 1) + '</span><span class="grow"><b>' + esc(u.n) + '</b><span class="small muted">' + r.total + "ステップ ・ 合格 " + r.done + "</span>" + bar(r.done, r.total) + "</span>" + markLabel(mk.mark, mk.pct) + "</button>"; }).join("") + "</div>" };
+      return { title: subjName(top.s, top.g) + " " + gradeName(top.g), html: '<p class="lead">単元をえらぼう</p>' + markLegend() + '<div class="list">' + us.map((u, ui) => { const r = unitStats(top.s, top.g, ui); const mk = unitRecord(top.s, top.g, ui); const ct = top.g >= 7 ? colorRec(top.s, top.g, u.n) : null; return '<button type="button" class="row-btn unit-row" data-unit="' + ui + '"><span class="un">' + (ui + 1) + '</span><span class="grow"><b>' + esc(u.n) + '</b><span class="small muted">' + r.total + "ステップ ・ 合格 " + r.done + (ct ? " ・ テスト " + ct.best + "点" : "") + "</span>" + bar(r.done, r.total) + "</span>" + markLabel(mk.mark, mk.pct) + "</button>"; }).join("") + "</div>" };
     }
     if (top.v === "steps") {
       const u = S()[top.s][top.g][top.u], tk = dayRec(today()).steps, sb = subjById(top.s);
@@ -700,6 +1189,10 @@
       const [bx, by] = pos(n);
       h += '<button type="button" class="map-node boss ' + (won ? "won " : "") + (allDone ? "cur" : "") + '" data-boss="1" style="left:' + bx + "%;top:" + by + 'px"><span class="mn-c">' + bossSvg(bossLook(top.s, top.g, top.u), 58) + (won ? '<i class="mn-crown">👑</i>' : "") + '</span><span class="mn-l"><b>ボスバトル</b><small>' + (won ? "クリア！ もう一度も OK" : "単元のまとめ問題") + "</small></span></button>";
       h += "</div>";
+      if (top.g >= 7) {
+        const ct = colorRec(top.s, top.g, u.n);
+        h += '<button type="button" class="box-card ct-enter" data-act="ct-start" data-s="' + top.s + '" data-g="' + top.g + '" data-ui="' + top.u + '"><span class="bx-i">🖍️</span><span class="grow"><b>カラーテスト（100点満点）</b><small>' + (ct ? "ベスト " + ct.best + " 点 " + markIcon(markOf(ct.best)) : "おもて 10問・うら 5問") + "</small></span><span class=\"go\">▶</span></button>";
+      }
       if ((state.wrongBox || []).length) h += '<button type="button" class="box-card" data-act="box"><span class="bx-i">📦</span><span class="grow"><b>まちがえた問題ボックス</b><small>' + state.wrongBox.length + " 問 ・ 正解すると消えるよ</small></span><span class=\"go\">▶</span></button>";
       return { title: u.n, html: h };
     }
@@ -840,7 +1333,9 @@
     svg.innerHTML = h;
   }
   function workClick(t) {
-    const q = curList()[Q.i], w = Q.work; if (!w || Q.answered) return false;
+    if (!Q || !Q.work || Q.answered || Q.mode === "color" || Q.mode === "kj50") return false;
+    const list = curList(); if (!list || Q.i == null) return false;
+    const q = list[Q.i], w = Q.work; if (!q) return false;
     let e;
     if ((e = t.closest("[data-ow]"))) { w.pick.push(+e.dataset.ow); sound("tap"); }
     else if ((e = t.closest("[data-os]"))) { const k = +e.dataset.os; if (w.pick[k] == null) return true; w.pick.splice(k, 1); }
@@ -1208,8 +1703,14 @@
   function quitQuiz() {
     $("#quiz").hidden = true; $("#quiz").innerHTML = ""; document.body.classList.remove("in-quiz");
     try { if (canSpeak()) speechSynthesis.cancel(); } catch (e) {}
+    if (KJ && KJ._pad && KJ._pad.cleanup) try { KJ._pad.cleanup(); } catch (e) {}
+    if (Q && (Q.mode === "color" || Q.mode === "kj50")) {
+      const back = Q.backNav; CT = null; KJ = null; Q = null;
+      if (back) { tab = "home"; modeNav = back; navDir = "back"; }
+      render(); return;
+    }
     if (Q && Q.ui != null) { nav = [{ v: "grades", s: Q.s }, { v: "units", s: Q.s, g: Q.g }, { v: "steps", s: Q.s, g: Q.g, u: Q.ui }]; tab = "study"; navDir = "back"; }
-    Q = null; render();
+    CT = null; KJ = null; Q = null; render();
   }
   function reportQ() {
     const q = curList()[Q.i];
@@ -1572,6 +2073,12 @@
     if (t.closest("#gl-close")) { closeLayer(); return; }
     // クイズ
     if (t.closest("#quiz")) {
+      const ctEl = t.closest("[data-ct]"); if (ctEl && handleColor(ctEl.dataset.ct, ctEl)) return;
+      const kjEl = t.closest("[data-kj]"); if (kjEl && handleKj(kjEl.dataset.kj, kjEl)) return;
+      if (Q && (Q.mode === "color" || Q.mode === "kj50")) {
+        const a = t.closest("[data-q]"); if (a && a.dataset.q === "quit") quitQuiz();
+        return;
+      }
       const o = t.closest("[data-opt]"); if (o && Q) { const q = curList()[Q.i]; answer((q.opts || [q.a].concat(q.o))[+o.dataset.opt]); return; }
       if (Q && Q.card) { const cb = t.closest("[data-q]"); if (cb && cb.dataset.q === "card-go") { Q.card = false; showQ(); } else if (cb && cb.dataset.q === "quit") quitQuiz(); return; }
       if (Q && !Q.answered) { const hit = t.closest("[data-hit]"); if (hit && curList()[Q.i].t === "tap") { answer(hit.dataset.hit); return; } if (workClick(t)) return; }
@@ -1665,6 +2172,13 @@
       else if (a === "td-save") saveDraftTest();
       else if (a === "test-del") { if (confirm("このテストを削除しますか？")) { state.tests = testsArr().filter((x) => x.id !== ac.dataset.id); save(); modeNav = [{ v: "test" }]; render(); toast("削除したよ"); } }
       else if (a === "mock-start") { const t2 = testsArr().find((x) => x.id === ac.dataset.id); if (t2) startMock(t2); }
+      else if (a === "mode-color") { modeNav = [{ v: "color", s: "math", g: (prepGrade() >= 7 ? prepGrade() : 7) }]; navDir = "fwd"; render(); window.scrollTo(0, 0); }
+      else if (a === "mode-kj") { modeNav = [{ v: "kj", g: kjGrade() }]; navDir = "fwd"; render(); window.scrollTo(0, 0); }
+      else if (a === "ct-g") { const cur = modeNav[modeNav.length - 1]; if (cur && cur.v === "color") { cur.g = +ac.dataset.g; const gs = gradesOf(cur.s || "math"); if (!gs.includes(cur.g)) { const f = SUBJ.find((x) => x.id !== "life" && gradesOf(x.id).includes(cur.g)); if (f) cur.s = f.id; } render(); } }
+      else if (a === "ct-s") { const cur = modeNav[modeNav.length - 1]; if (cur && cur.v === "color") { cur.s = ac.dataset.s; render(); } }
+      else if (a === "ct-start") { startColorTest(ac.dataset.s, +ac.dataset.g, +ac.dataset.ui); }
+      else if (a === "kj-g") { const cur = modeNav[modeNav.length - 1]; if (cur && cur.v === "kj") { cur.g = +ac.dataset.g; render(); } }
+      else if (a === "kj-start") { startKj(ac.dataset.mode, +ac.dataset.g); }
     }
   });
   document.addEventListener("change", (e) => {
@@ -1715,7 +2229,7 @@
     // プロフィール（保存場所）を切りかえる。data があればそれを使い、なければその場所の記録を読む
     useProfile: (key, data, opt) => { KEY = key || GUEST_KEY; let d = data; if (d === undefined) { try { d = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { d = null; } } state = migrate(d ? JSON.parse(JSON.stringify(d)) : null); try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} if (Q && !$("#quiz").hidden) { try { quitQuiz(); } catch (e) {} } if (opt && opt.home) { tab = "home"; nav = []; navDir = "tab"; } render(); },
     setAcct: (a) => { if (!a || !a.uid) return; const cur = state.acct || {}; if (cur.uid === a.uid && cur.email === a.email && cur.name === a.name && cur.provider === a.provider) return; state.acct = { uid: a.uid, email: a.email || "", name: a.name || "", provider: a.provider || "" }; save(); },
-    profileKey: () => KEY, GUEST_KEY, charHtml, setTab: (t) => { tab = t; nav = []; render(); }, _ans: (ok) => { const q = curList()[Q.i]; Q.shownAt = -1e9; answer(q.t === "ch" ? (ok ? q.a : "__x__") : { ok, text: ok ? q.a : "x" }); }, sound, toast, haptic, openSheet, closeSheet, startBox, startBoss, startStep, speak, canSpeak };
+    profileKey: () => KEY, GUEST_KEY, charHtml, setTab: (t) => { tab = t; nav = []; render(); }, _ans: (ok) => { const q = curList()[Q.i]; Q.shownAt = -1e9; answer(q.t === "ch" ? (ok ? q.a : "__x__") : { ok, text: ok ? q.a : "x" }); }, sound, toast, haptic, openSheet, closeSheet, startBox, startBoss, startStep, speak, canSpeak, startColorTest, startKj, colorRec, kjGrade };
 
   // テスト用：?clock=+86400000 のように時計をずらせる
   try { const c = new URLSearchParams(location.search).get("clock"); if (c) clockOffset = +c || 0; } catch (e) {}

@@ -1348,3 +1348,107 @@ html.rmotion .mode-sel, html.rmotion .ms-slot { animation: none; }
   .mode-card b { font-size: 18px; }
   .mode-card small { font-size: 12px; }
 }
+
+/* v1.4.0 カラーテスト・漢字50問、第2回の小さな直し */
+.mode-card small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; max-height: 2.8em; }
+.gk-outfits { margin-bottom: 22px; position: relative; z-index: 1; }
+.gk-ost { white-space: nowrap; position: relative; z-index: 2; }
+.gk-zukan { position: relative; z-index: 0; }
+.gk-zk small { min-height: 2.5em; display: flex; align-items: flex-start; justify-content: center; overflow-wrap: anywhere; line-height: 1.25; }
+
+.drill2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 16px; }
+.drill-card { position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 118px; text-align: left; border: 0; border-radius: 22px; padding: 14px 12px 12px; color: #fff; font: inherit; box-shadow: 0 12px 26px rgba(40,30,100,.18); }
+.drill-card::after { content: ""; position: absolute; right: -16px; top: -20px; width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,.16); pointer-events: none; }
+.drill-card.color { background: linear-gradient(160deg, #c92a2a, #e8590c 55%, #f08c00); }
+.drill-card.kj { background: linear-gradient(160deg, #1c7ed6, #364fc7); }
+.drill-card .mc-ico { font-size: 22px; width: 40px; height: 40px; display: grid; place-items: center; background: rgba(255,255,255,.2); border-radius: 14px; margin-bottom: 8px; }
+.drill-card b { font-size: 16px; font-weight: 900; }
+.drill-card small { font-size: 11px; font-weight: 700; opacity: .94; margin-top: 4px; line-height: 1.35; }
+.drill-acts { display: grid; gap: 10px; margin: 8px 0 12px; }
+.kj-hero-card { margin: 8px 0 16px; padding: 18px 16px; border-radius: 22px; background: linear-gradient(165deg, #edf2ff, #fff); box-shadow: 0 10px 24px rgba(60,50,140,.1); }
+.kj-hero-card .kj-hk { font-size: 11px; font-weight: 800; letter-spacing: .08em; color: #1c7ed6; }
+.kj-hero-card b { display: block; font-size: 28px; font-weight: 900; margin: 2px 0 4px; }
+.kj-best { margin-top: 8px; font-weight: 800; color: #364fc7; }
+
+.ct-cover, .kj-cover, .ct-result { padding: 22px 16px 24px; text-align: center; }
+.ct-seal { display: inline-block; font-size: 11px; font-weight: 900; letter-spacing: .16em; padding: 4px 10px; border: 2px solid #c41e3a; color: #c41e3a; border-radius: 4px; transform: rotate(-8deg); margin-bottom: 8px; font-family: "Yu Mincho", "Hiragino Mincho ProN", "Hiragino Mincho Pro", serif; }
+.ct-kicker { font-size: 13px; font-weight: 800; letter-spacing: .12em; color: #c41e3a; margin-bottom: 6px; }
+.ct-cover h2, .kj-cover h2 { margin: 0; font-size: 22px; }
+.ct-unit { font-size: 26px; font-weight: 900; margin: 6px 0 14px; }
+.ct-pts { display: grid; gap: 4px; margin: 0 auto 14px; padding: 12px 14px; border-radius: 16px; background: #fff5f5; color: #5c1a1a; font-weight: 700; font-size: 13px; max-width: 360px; }
+.ct-pts b { font-size: 18px; color: #c41e3a; }
+
+.ct-sheet { min-height: 100%; background: #efe6c9; padding: 0 0 24px; }
+.ct-bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #e7d9a8; position: sticky; top: 0; z-index: 3; }
+.ct-x { width: 36px; height: 36px; border: 0; border-radius: 50%; background: #fff; font-size: 16px; font-weight: 800; color: #5c5f77; }
+.ct-flip { display: flex; gap: 0; background: #fff; border-radius: 999px; padding: 3px; flex: 1; }
+.ct-tab { flex: 1; border: 0; border-radius: 999px; padding: 8px 0; font: inherit; font-weight: 900; background: transparent; color: #7c5a00; }
+.ct-tab.on { background: #c41e3a; color: #fff; }
+.ct-live { font-weight: 900; color: #c41e3a; white-space: nowrap; padding-right: 6px; }
+.ct-paper { margin: 10px 10px 0; padding: 16px 14px 20px; border-radius: 4px 4px 2px 2px; background: #fffaf0; background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 27px, rgba(80,140,200,.16) 28px); box-shadow: 0 8px 0 #e0c988, 0 16px 28px rgba(80,40,0,.18); color: #222; font-family: "Yu Mincho", "Hiragino Mincho ProN", "Hiragino Mincho Pro", "YuGothic", serif; position: relative; }
+.ct-paper::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 8px; background: linear-gradient(90deg, #c41e3a 0 22%, #1c7ed6 22% 44%, #2f9e44 44% 66%, #f08c00 66% 88%, #c41e3a 88% 100%); }
+.ct-head { padding: 10px 4px 8px; margin-bottom: 8px; }
+.ct-brand { font-size: 12px; font-weight: 900; letter-spacing: .14em; color: #c41e3a; }
+.ct-meta { font-size: 13px; font-weight: 700; margin-top: 2px; }
+.ct-title { font-size: 22px; font-weight: 900; margin: 4px 0 8px; }
+.ct-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; }
+.ct-name { font-size: 13px; } .ct-name i { font-style: normal; display: inline-block; min-width: 7em; border-bottom: 1px solid #333; padding: 0 6px; font-weight: 800; }
+.ct-scorebox { border: 2px solid #c41e3a; color: #c41e3a; padding: 4px 8px; font-weight: 900; font-size: 13px; background: #fff; }
+.ct-scorebox b { font-size: 22px; min-width: 1.6em; display: inline-block; text-align: center; }
+.ct-rule { margin-top: 8px; font-size: 12px; font-weight: 700; color: #1c5aa0; }
+.ct-q { position: relative; margin: 12px 0; padding: 8px 28px 10px 0; }
+.ct-qn { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.ct-no { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #1c7ed6; color: #fff; font-size: 12px; font-weight: 900; font-family: sans-serif; }
+.ct-pt { font-size: 12px; font-weight: 900; color: #c41e3a; font-family: sans-serif; }
+.ct-qp { font-size: 16px; font-weight: 700; line-height: 1.55; margin: 0 0 8px; }
+.ct-opts { display: grid; gap: 6px; }
+.ct-opt { text-align: left; border: 1px solid #cbbd8a; background: #fff; border-radius: 10px; padding: 8px 10px; font: inherit; font-size: 15px; font-weight: 700; color: #222; }
+.ct-opt.on { border-color: #1c7ed6; box-shadow: 0 0 0 2px rgba(28,126,214,.25); background: #e7f5ff; }
+.ct-opt.right { border-color: #2f9e44; background: #ebfbee; }
+.ct-opt.wrong { border-color: #c41e3a; background: #fff5f5; }
+.ct-num { margin-top: 4px; }
+.ct-in { width: 100%; border: 0; border-bottom: 2px solid #333; background: transparent; font: inherit; font-size: 18px; font-weight: 800; padding: 4px 2px; border-radius: 0; }
+.ct-ans { margin-top: 6px; font-size: 13px; font-weight: 800; color: #c41e3a; }
+.ct-mark { position: absolute; right: -4px; top: 6px; font-style: normal; font-size: 36px; font-weight: 900; color: #c41e3a; transform: rotate(-12deg); pointer-events: none; font-family: "Yu Mincho", serif; line-height: 1; }
+.ct-q.ok .ct-mark { color: #c41e3a; }
+.ct-q.ng .ct-mark { color: #c41e3a; font-size: 34px; }
+.ct-foot { display: grid; gap: 8px; padding: 14px 12px 8px; }
+.ct-result { position: relative; }
+.ct-score-hero { margin: 8px 0 14px; }
+.ct-sh-k { font-size: 13px; font-weight: 800; letter-spacing: .08em; color: #c41e3a; }
+.ct-sh-n { font-weight: 900; line-height: 1; margin: 4px 0 8px; }
+.ct-sh-n b { font-size: 56px; color: #c41e3a; }
+.ct-sh-n small { font-size: 18px; color: #5c1a1a; }
+.ct-break { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 0 0 12px; }
+.ct-break div { background: #fff; border-radius: 14px; padding: 10px 6px; box-shadow: 0 6px 16px rgba(60,50,140,.08); }
+.ct-break b { display: block; font-size: 11px; color: #7c5a00; }
+.ct-break span { font-size: 14px; font-weight: 900; }
+.ct-coin { font-weight: 800; color: #8f5b00; }
+.ct-hana { position: relative; width: 120px; height: 120px; margin: 0 auto 6px; border: 6px solid #e03131; border-radius: 50%; display: grid; place-items: center; transform: rotate(-8deg); box-shadow: 0 0 0 5px #fff, 0 0 0 8px #ffa8a8; background: rgba(255,240,240,.5); }
+.ct-hana span { font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-weight: 900; font-size: 28px; color: #c41e3a; letter-spacing: .08em; }
+.ct-hana.perfect { border-color: #c41e3a; box-shadow: 0 0 0 5px #fff, 0 0 0 8px #ffd43b, 0 0 0 11px #c41e3a; }
+.ct-hana::before, .ct-hana::after { content: "✿"; position: absolute; font-size: 18px; color: #e03131; }
+.ct-hana::before { top: -4px; left: 8px; } .ct-hana::after { bottom: -2px; right: 8px; }
+
+.kj50 { min-height: 100%; background: linear-gradient(180deg, #edf2ff, #fff 40%); padding-bottom: 24px; }
+.kj50 .ct-bar { background: #d0ebff; }
+.kj50-body { padding: 12px 16px 20px; }
+.kj50-kind { display: inline-block; font-size: 12px; font-weight: 900; letter-spacing: .08em; padding: 4px 10px; border-radius: 999px; background: #1c7ed6; color: #fff; margin-bottom: 10px; }
+.kj50-q { font-weight: 800; font-size: 16px; margin: 0 0 10px; }
+.kj50-word { font-size: 36px; font-weight: 900; text-align: center; margin: 8px 0 16px; letter-spacing: .08em; font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; }
+.kj50-pad { width: min(100%, 52vh, 280px); max-width: 280px; margin: 0 auto 8px; aspect-ratio: 1; border: 2px solid #1c7ed6; border-radius: 16px; overflow: hidden; background: #fffdf7; }
+.kj50-pad canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.kj50-ans { text-align: center; margin: 10px 0; font-weight: 800; color: #c41e3a; }
+.kj50-char { display: inline-block; font-size: 64px; line-height: 1; font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; color: #111; margin-left: 8px; }
+.kj50-fb { text-align: center; font-weight: 900; font-size: 18px; margin: 10px 0; }
+.kj-miss { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.kj-m { display: flex; flex-direction: column; align-items: center; min-width: 52px; padding: 8px 6px; border-radius: 12px; background: #fff; box-shadow: 0 4px 12px rgba(60,50,140,.08); font-size: 22px; font-weight: 900; font-family: "Yu Mincho", serif; }
+.kj-m small { font-size: 10px; font-weight: 800; color: #868e96; font-family: sans-serif; }
+.kjq.big { font-size: 34px; }
+
+
+.kj-tools { margin: 8px 0 12px; flex-wrap: wrap; }
+.kj50-body { padding-bottom: 18px; }
+.kj50 .btn.block { margin-bottom: 8px; }
+.kj-result .sum-char { margin-top: 8px; }
+.kj-result .kj-miss { margin: 8px 0 18px; }
