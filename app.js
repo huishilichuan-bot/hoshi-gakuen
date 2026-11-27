@@ -2155,15 +2155,17 @@
     arena: "battle", royale: "battle",
     chess: "board", reversi: "board", gomoku: "board", shogi: "board", connect4: "board", ultimate: "board", dots: "board", mancala: "board", checkers: "board", hex: "board", battleship: "board", hasami: "board",
     memory: "card", pyramid: "card", sevens: "card", oldmaid: "card" };
-  const genreOf = (g) => g.genre || GENRE_OF[g.id] || "action";
+  const genreOf = (g) => (window.HMCatalog && HMCatalog.genreOf(g)) || g.genre || GENRE_OF[g.id] || "action";
   let gameGenre = "all";
+  function gamesList() { return (window.HMCatalog && HMCatalog.entries(GAMES)) || GAMES; }
   function viewGames() {
     const open = gamesOpen(), n = starsToday();
-    const list = GAMES.filter((g) => gameGenre === "all" || genreOf(g) === gameGenre);
+    const all = gamesList();
+    const list = all.filter((g) => gameGenre === "all" || genreOf(g) === gameGenre);
     let h = '<div class="gate ' + (open ? "open" : "") + '">' + (open ? "🎮 今日はゲームで遊べるよ！（⭐" + n + "）" : "🔒 今日の⭐が " + STARS_TO_UNLOCK + " こになるとひらきます（今 " + n + " こ）") + "</div>";
-    h += '<div class="genre-bar" role="tablist" aria-label="ジャンル">' + GENRES.map(([k, l, e]) => { const c = k === "all" ? GAMES.length : GAMES.filter((g) => genreOf(g) === k).length; return c ? '<button type="button" role="tab" class="genre-chip' + (gameGenre === k ? " on" : "") + '" aria-selected="' + (gameGenre === k) + '" data-genre="' + k + '"><span>' + e + "</span>" + l + "<small>" + c + "</small></button>" : ""; }).join("") + "</div>";
-    h += '<div class="app-grid">' + list.map((g, i) => '<button type="button" class="app-ic ' + (open ? "" : "locked") + '" data-game="' + g.id + '" style="--i:' + (i % 24) + '"><span class="ai">' + HMIcons.icon(g.id, g.c, 62, g.e) + (g.pro ? '<span class="newb">NEW</span>' : "") + (open ? "" : '<span class="lock">🔒</span>') + "</span><span class=\"an\">" + esc(g.n) + "</span></button>").join("") + "</div>";
-    h += '<p class="foot">全' + GAMES.length + 'ゲーム</p>';
+    h += '<div class="genre-bar" role="tablist" aria-label="ジャンル">' + GENRES.map(([k, l, e]) => { const c = k === "all" ? all.length : all.filter((g) => genreOf(g) === k).length; return c ? '<button type="button" role="tab" class="genre-chip' + (gameGenre === k ? " on" : "") + '" aria-selected="' + (gameGenre === k) + '" data-genre="' + k + '"><span>' + e + "</span>" + l + "<small>" + c + "</small></button>" : ""; }).join("") + "</div>";
+    h += '<div class="app-grid">' + list.map((g, i) => '<button type="button" class="app-ic ' + (open ? "" : "locked") + '" data-game="' + g.id + '" style="--i:' + (i % 24) + '"><span class="ai">' + HMIcons.icon(g.id, g.c, 62, g.e) + (g.fresh ? '<span class="newb">NEW</span>' : "") + (open ? "" : '<span class="lock">🔒</span>') + "</span><span class=\"an\">" + esc(g.n) + (g.group ? '<small class="an-sub">' + g.members.length + "種目</small>" : "") + "</span></button>").join("") + "</div>";
+    h += '<p class="foot">全' + all.length + "ゲーム</p>";
     return h;
   }
   function gameRank(id) {
@@ -2179,16 +2181,31 @@
   const DCOL = { easy: "green", normal: "blue", hard: "red", ultra: "purple" };
   function closeModeSel(instant) { const el = document.getElementById("mode-sel"); if (!el) return; if (instant) { el.remove(); return; } el.classList.add("out"); setTimeout(() => el.remove(), 220); }
   function openGameMenu(id) {
-    const g = GAMES.find((x) => x.id === id); if (!g) return;
+    const pack = (window.HMCatalog && HMCatalog.find(GAMES, id)) || GAMES.find((x) => x.id === id); if (!pack) return;
     if (!gamesOpen()) { toast("🔒 今日の⭐をあと " + (STARS_TO_UNLOCK - starsToday()) + " こ集めるとひらくよ"); return; }
     closeModeSel(true);
-    const rec = state.games[id] || {};
-    const btns = DIFFS.map((d, i) => { const r = rec[d.id] || {}, bt = bestText(r.m), rk = diffRank(r);
-      return '<div class="ms-slot" style="--i:' + i + '"><button type="button" class="ms-btn ms-' + DCOL[d.id] + '" data-diff="' + d.id + '">' + d.name + '</button><div class="ms-rec"><span class="ms-best num">' + (bt ? esc(bt) : "－") + '</span><span class="ms-rank' + (rk ? " r" + rk : "") + '">' + (rk || "－") + "</span></div></div>"; }).join("");
-    const el = document.createElement("div"); el.id = "mode-sel"; el.className = "mode-sel"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", g.n + " モード選択");
-    el.innerHTML = '<div class="ms-panel"><h2 class="ms-title">モード選択</h2><div class="ms-game"><span>' + HMIcons.icon(g.id, g.c, 28, g.e) + esc(g.n) + "</span></div>" + btns + '</div><button type="button" class="ms-top" data-ms="top"><span class="ms-home">⌂</span>トップにもどる</button>';
+    let playId = pack.group ? pack.members[0].id : pack.id;
+    const paint = () => {
+      const g = pack.group ? pack.members.find((x) => x.id === playId) || pack.members[0] : pack;
+      playId = g.id;
+      const rec = state.games[playId] || {};
+      const btns = DIFFS.map((d, i) => { const r = rec[d.id] || {}, bt = bestText(r.m), rk = diffRank(r);
+        return '<div class="ms-slot" style="--i:' + i + '"><button type="button" class="ms-btn ms-' + DCOL[d.id] + '" data-diff="' + d.id + '">' + d.name + '</button><div class="ms-rec"><span class="ms-best num">' + (bt ? esc(bt) : "－") + '</span><span class="ms-rank' + (rk ? " r" + rk : "") + '">' + (rk || "－") + "</span></div></div>"; }).join("");
+      let courses = "";
+      if (pack.group) {
+        courses = '<div class="ms-courses">' + pack.members.map((m) => '<button type="button" class="ms-course' + (m.id === playId ? " on" : "") + '" data-course="' + m.id + '">' + (m.e || "") + " " + esc(m.n) + "</button>").join("") + "</div>";
+      }
+      el.querySelector(".ms-panel").innerHTML = '<h2 class="ms-title">モード選択</h2><div class="ms-game"><span>' + HMIcons.icon(g.id, g.c, 28, g.e) + esc(pack.group ? pack.n + " ／ " + g.n : g.n) + "</span></div>" + courses + btns;
+    };
+    const el = document.createElement("div"); el.id = "mode-sel"; el.className = "mode-sel"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", pack.n + " モード選択");
+    el.innerHTML = '<div class="ms-panel"></div><button type="button" class="ms-top" data-ms="top"><span class="ms-home">⌂</span>トップにもどる</button>';
     document.body.appendChild(el);
-    el.addEventListener("click", (e) => { const b = e.target.closest("[data-diff]"); if (b) { sound("tap"); closeModeSel(true); startGame(id, b.dataset.diff); return; } if (e.target.closest('[data-ms="top"]') || e.target === el) { sound("tap"); closeModeSel(); } });
+    paint();
+    el.addEventListener("click", (e) => {
+      const c = e.target.closest("[data-course]"); if (c) { sound("tap"); playId = c.dataset.course; paint(); return; }
+      const b = e.target.closest("[data-diff]"); if (b) { sound("tap"); closeModeSel(true); startGame(playId, b.dataset.diff); return; }
+      if (e.target.closest('[data-ms="top"]') || e.target === el) { sound("tap"); closeModeSel(); }
+    });
   }
   function startGame(id, diff) {
     if (!gamesOpen()) return;
@@ -2197,7 +2214,7 @@
       else if (id === "arena") window.GFGames.openArena(diff);
       else if (id === "chess") window.GFChess.open({ diff });
       else if (window.GCGames && GCGames.open[id]) GCGames.open[id](diff);
-      else toast("このゲームは準備中です");
+      else return;
     } catch (e) { console.error(e); toast("ゲームを開けませんでした"); }
   }
   let layerOnClose = null;

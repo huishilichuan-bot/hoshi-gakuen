@@ -1522,3 +1522,9 @@ html.rmotion .mode-sel, html.rmotion .ms-slot { animation: none; }
 .tf-cand { margin: 8px 0 4px; padding: 8px 12px; border-radius: 12px; background: #fff; border: 1px dashed #b8bce0; font-weight: 800; }
 .tf-cand::before { content: "このこたえは正しい？"; display: block; font-size: 11px; font-weight: 800; color: #7048e8; letter-spacing: .04em; margin-bottom: 4px; }
 .ex-q .tf-cand { background: #fff; }
+
+/* ゲーム一覧：種目まとめ */
+.app-ic .an-sub { display: block; font-size: 10px; font-weight: 700; opacity: .75; margin-top: 2px; }
+.ms-courses { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.ms-course { border: 0; border-radius: 999px; padding: 7px 11px; background: #edf2ff; color: #364fc7; font: inherit; font-size: 12.5px; font-weight: 800; }
+.ms-course.on { background: #5f3dc4; color: #fff; }
