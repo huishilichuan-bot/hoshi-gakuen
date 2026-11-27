@@ -1452,3 +1452,69 @@ html.rmotion .mode-sel, html.rmotion .ms-slot { animation: none; }
 .kj50 .btn.block { margin-bottom: 8px; }
 .kj-result .sum-char { margin-top: 8px; }
 .kj-result .kj-miss { margin: 8px 0 18px; }
+
+/* 単元一覧：中学の6単元が iPhone でも見渡せるように少し詰める */
+.units-page { padding-bottom: 8px; }
+.units-page .lead { margin: 0 0 8px; }
+.units-page .mark-leg { margin-bottom: 8px; padding: 8px 10px; }
+.units-page .list { gap: 6px; }
+.units-page .row-btn { padding: 8px 12px; min-height: 50px; gap: 8px; }
+.units-page .un { width: 30px; height: 30px; font-size: 13px; }
+
+/* 定期テスト（中間・期末） */
+.ex-hero { margin: 8px 0 16px; padding: 18px 16px 16px; border-radius: 24px; background: linear-gradient(165deg, #efe7ff, #fff 55%); box-shadow: 0 12px 28px rgba(60,50,140,.12); }
+.ex-hero .eh-k { font-size: 11px; font-weight: 800; letter-spacing: .1em; color: #7048e8; }
+.ex-hero b { display: block; font-size: 22px; font-weight: 900; margin: 4px 0 6px; }
+.ex-hero small { display: block; color: #5c5f77; font-weight: 700; }
+.ex-totals { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 16px; }
+.ex-tot { padding: 12px 14px; border-radius: 18px; background: #fff; box-shadow: 0 6px 16px rgba(60,50,140,.08); }
+.ex-tot .k { font-size: 11px; font-weight: 800; color: #7048e8; letter-spacing: .06em; }
+.ex-tot .n { font-size: 22px; font-weight: 900; margin-top: 2px; }
+.ex-tot .n small { font-size: 13px; font-weight: 800; color: #6b6f8a; }
+.ex-tot .yet { font-size: 11.5px; font-weight: 700; color: #868e96; margin-top: 2px; }
+.drill-card.exam { background: linear-gradient(135deg, #7b2cbf, #5f3dc4 55%, #3b5bdb); color: #fff; margin: 0 0 10px; min-height: 100px; }
+.drill3 { display: grid; gap: 8px; margin: 0 0 14px; }
+.ex-sub { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; border-radius: 18px; padding: 12px 14px; background: #fff; box-shadow: 0 8px 18px rgba(60,50,140,.1); font: inherit; color: inherit; }
+.ex-sub .grow b { display: block; font-size: 15px; font-weight: 900; }
+.ex-sub small { color: #6b6f8a; font-weight: 700; }
+.ex-sheet { padding-bottom: 88px; }
+.ex-bar { display: flex; align-items: center; gap: 8px; position: sticky; top: 0; z-index: 3; background: var(--bg); padding: 4px 0 8px; }
+.ex-clock { margin-left: auto; font-weight: 900; font-variant-numeric: tabular-nums; font-size: 14px; color: #5f3dc4; background: #efe7ff; border-radius: 999px; padding: 4px 10px; }
+.ex-clock.warn { color: #e03131; background: #ffe3e3; }
+.ex-paper { background: #fff; border-radius: 20px; padding: 16px 14px 20px; box-shadow: 0 10px 24px rgba(60,50,140,.1); }
+.ex-head { border-bottom: 2px solid #e9ecef; padding-bottom: 12px; margin-bottom: 12px; }
+.ex-brand { font-size: 11px; font-weight: 800; letter-spacing: .12em; color: #7048e8; }
+.ex-meta { font-size: 13px; font-weight: 800; margin-top: 2px; }
+.ex-title { font-size: 20px; font-weight: 900; margin: 6px 0 8px; }
+.ex-row { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 700; color: #5c5f77; }
+.ex-scorebox b { font-size: 18px; color: var(--ink); }
+.ex-part { margin: 18px 0 8px; padding-top: 8px; border-top: 1px dashed #dee2e6; }
+.ex-part h3 { font-size: 15px; font-weight: 900; margin: 0 0 4px; }
+.ex-part .ep-sub { font-size: 12px; font-weight: 700; color: #6b6f8a; margin-bottom: 10px; }
+.ex-q { position: relative; margin: 0 0 14px; padding: 10px 10px 10px 8px; border-radius: 14px; background: #f8f9fc; }
+.ex-q .eq-n { font-size: 12px; font-weight: 900; color: #7048e8; }
+.ex-q .eq-q { font-size: 15px; font-weight: 800; margin: 4px 0 8px; line-height: 1.45; }
+.ex-q .ct-opt, .ex-q .ex-opt { display: block; width: 100%; text-align: left; margin: 0 0 6px; padding: 10px 12px; border-radius: 12px; border: 1px solid #dee2e6; background: #fff; font: inherit; font-weight: 700; }
+.ex-q .ex-opt.on { border-color: #5c7cfa; background: #edf2ff; }
+.ex-q.graded .ex-opt.right { border-color: #2b8a3e; background: #d3f9d8; }
+.ex-q.graded .ex-opt.wrong { border-color: #c92a2a; background: #ffe3e3; }
+.ex-q .ex-in { width: 100%; border: 1px solid #dee2e6; border-radius: 12px; padding: 10px 12px; font: inherit; font-weight: 800; }
+.ex-mark { position: absolute; right: 8px; top: 8px; font-weight: 900; font-size: 18px; }
+.ex-foot { position: sticky; bottom: 0; display: flex; gap: 8px; padding: 10px 0 calc(var(--sab) + 8px); background: linear-gradient(180deg, transparent, var(--bg) 30%); }
+.ex-timeup { margin: 8px 0; padding: 10px 12px; border-radius: 14px; background: #fff4e6; color: #e8590c; font-weight: 800; font-size: 13px; }
+.ex-result { padding: 8px 0 24px; }
+.ex-score-hero { text-align: center; padding: 18px 12px; }
+.ex-score-hero .k { font-size: 12px; font-weight: 800; letter-spacing: .08em; color: #7048e8; }
+.ex-score-hero .n { font-size: 48px; font-weight: 900; line-height: 1.05; }
+.ex-score-hero .n small { font-size: 16px; color: #6b6f8a; }
+.ex-parts { display: grid; gap: 6px; margin: 8px 0 16px; }
+.ex-parts div { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 14px; background: #fff; box-shadow: 0 4px 12px rgba(60,50,140,.07); font-weight: 800; font-size: 13.5px; }
+.ex-rev { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.ex-rev button { border: 0; border-radius: 999px; padding: 7px 12px; background: #edf2ff; color: #3b5bdb; font: inherit; font-size: 12.5px; font-weight: 800; }
+.ex-chart { background: #fff; border-radius: 20px; padding: 12px 8px 8px; box-shadow: 0 8px 18px rgba(60,50,140,.08); margin: 0 0 16px; }
+.ex-chart svg { width: 100%; height: auto; display: block; }
+.ex-chart path.line { fill: none; stroke: #5f3dc4; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.ex-chart circle { fill: #5f3dc4; }
+.ex-chart .grid { stroke: #e9ecef; stroke-width: 1; }
+.ex-chart text { font-size: 10px; font-weight: 700; fill: #868e96; }
+.ex-hist .row-btn .grow small { display: block; }

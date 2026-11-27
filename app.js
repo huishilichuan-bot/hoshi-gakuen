@@ -1,7 +1,7 @@
 /* ほしの学園 — 勉強して⭐を集める学習アプリ（小1〜中3）。課金・お金の機能はありません。 */
 (() => {
   "use strict";
-  const VERSION = "1.5.0";
+  const VERSION = "1.6.0";
   // 記録はプロフィールごとに分けて保存：ゲスト＝"hoshigakuen"、アカウント＝"hoshigakuen:u:<uid>"（ログアウトで消す）
   const GUEST_KEY = "hoshigakuen";
   let KEY = GUEST_KEY;
@@ -77,7 +77,7 @@
   function fresh() {
     return { schema: SCHEMA, created: now(), settings: { sound: true, haptic: true, nick: "", vol: 0.8, bgm: true, bgmVol: 0.5, remind: false, remindAt: "17:00", fs: "m", rmotion: false, grade: 0, hint: true }, days: {}, totalStars: 0, pulls: 0, pullsUsed: 0,
       chars: { mori: { n: 1, shards: 0, star: 0, t: now() } }, partner: "mori", look: { bg: "note", maru: "red", title: "first" },
-      progress: {}, last: null, reports: [], gachaLog: [], games: {}, wrongBox: [], boxGone: {}, bossWins: {}, boxCleared: 0, bestCombo: 0, use: {}, gk: {}, tests: [], colorTests: {}, colorCoin: {}, kjWrong: [], kjBest: {}, kjCoin: {} };
+      progress: {}, last: null, reports: [], gachaLog: [], games: {}, wrongBox: [], boxGone: {}, bossWins: {}, boxCleared: 0, bestCombo: 0, use: {}, gk: {}, tests: [], colorTests: {}, colorCoin: {}, kjWrong: [], kjBest: {}, kjCoin: {}, examHist: [], examCoin: {} };
   }
   function migrate(s) {
     if (!s || typeof s !== "object") return fresh();
@@ -517,6 +517,9 @@
     if (top.v === "marks") return { title: "単元のようす", html: viewMarks() };
     if (top.v === "color") return { title: "カラーテスト", html: viewColorHome() };
     if (top.v === "kj") return { title: "漢字50問", html: viewKjHome() };
+    if (top.v === "exam") return { title: "定期テスト", html: viewExamHome() };
+    if (top.v === "exam-scope") return { title: "範囲とタイマー", html: viewExamScope() };
+    if (top.v === "exam-hist") return { title: "履歴と点数の推移", html: viewExamHist() };
     return { title: "ほしの学園", html: "" };
   }
   function viewReview() {
@@ -548,6 +551,7 @@
   function viewTests() {
     const up = upcomingTests(), past = pastTests();
     let h = '<p class="lead">テストの日と範囲を登録すると、毎日の計画とカウントダウンができるよ。</p>';
+    h += '<button type="button" class="btn block exam-enter" data-act="mode-exam">📝 中間・期末の問題用紙（100点）</button>';
     h += '<button type="button" class="btn primary block" data-act="mode-test-new">＋ テストを登録</button>';
     if (up.length) {
       h += '<div class="sec2">これから</div><div class="list">';
@@ -580,6 +584,19 @@
     }
     h += '<div class="sec2">範囲</div>' + markLegend() + '<div class="list">' + recs.map((r) => unitRow(r, "go-unit-start")).join("") + "</div>";
     if (left >= 0 && recs.length) h += '<button type="button" class="btn primary block mock-go" data-act="mock-start" data-id="' + esc(t.id) + '">📝 範囲から模擬テスト（10問）</button>';
+    const byS = {};
+    recs.forEach((r) => { (byS[r.s] = byS[r.s] || []).push(r); });
+    const subjIds = Object.keys(byS);
+    if (subjIds.length) {
+      h += '<div class="sec2">100点の問題用紙</div><div class="list">';
+      subjIds.forEach((s) => {
+        const gg = byS[s][0].g;
+        const last = (t.system && t.kind) ? latestExam(s, gg, t.system, t.kind) : null;
+        const minutes = window.HMExam ? examSpec(s).minutes : 50;
+        h += '<button type="button" class="ex-sub" data-act="ex-from-test" data-id="' + esc(t.id) + '" data-s="' + s + '">' + HMIcons.icon(s, subjById(s).c, 36) + '<span class="grow"><b>' + esc(subjName(s, gg)) + '　100点</b><small>' + byS[s].length + '単元 ・ ' + minutes + '分' + (last ? ' ・ 前は ' + last.score + '点' : '') + '</small></span><span class="go">▶</span></button>';
+      });
+      h += "</div>";
+    }
     if (t.lastMock) h += '<p class="small muted center">前の模擬テスト　' + t.lastMock.ok + "/" + t.lastMock.n + "（" + t.lastMock.pct + "%）</p>";
     h += '<div class="actions two tight"><button type="button" class="btn" data-act="mode-test-edit" data-id="' + esc(t.id) + '">編集</button><button type="button" class="btn ghost" data-act="test-del" data-id="' + esc(t.id) + '">削除</button></div>';
     return h;
@@ -590,6 +607,20 @@
     const us = ((S()[d.pickS] || {})[d.pickG] || []);
     let h = '<label class="field"><span>テストの名前</span><input class="input" id="tm-name" maxlength="24" value="' + esc(d.name) + '" placeholder="' + esc(defaultTestName(d.scope)) + '"></label>';
     h += '<label class="field"><span>テストの日</span><input class="input" id="tm-date" type="date" value="' + esc(d.date) + '" min="' + today() + '"></label>';
+    if (window.HMExam) {
+      const midG = (d.examG >= 7 && d.examG <= 9) ? d.examG : ((d.pickG >= 7 && d.pickG <= 9) ? d.pickG : 7);
+      const sys = String(d.system || "3");
+      const terms = HMExam.termsOf(sys);
+      let kind = d.kind || terms[0].id;
+      if (!terms.some((x) => x.id === kind)) kind = terms[0].id;
+      d.examG = midG; d.system = sys; d.kind = kind;
+      h += '<div class="sec2">定期テストのプリセット</div>';
+      h += '<div class="chips wrap"><button type="button" class="chip' + (sys === "3" ? " on" : "") + '" data-act="td-sys" data-sys="3">3学期制</button><button type="button" class="chip' + (sys === "2" ? " on" : "") + '" data-act="td-sys" data-sys="2">前期・後期</button></div>';
+      h += '<div class="chips wrap">' + [7, 8, 9].map((x) => '<button type="button" class="chip' + (x === midG ? " on" : "") + '" data-act="td-exam-g" data-g="' + x + '">' + gradeName(x) + "</button>").join("") + "</div>";
+      h += '<div class="chips wrap">' + terms.map((x) => '<button type="button" class="chip' + (x.id === kind ? " on" : "") + '" data-act="td-kind" data-kind="' + x.id + '">' + esc(x.n) + "</button>").join("") + "</div>";
+      h += '<button type="button" class="btn block" data-act="td-preset">この範囲を入れる</button>';
+      h += '<p class="small muted">えらぶと、その回の教科の範囲が一気に入るよ。あとは単元を足したり外したりできるよ。</p>';
+    }
     h += '<div class="sec2">範囲の教科</div><div class="chips wrap">' + SUBJ.map((s) => '<button type="button" class="chip' + (s.id === d.pickS ? " on" : "") + '" data-act="td-s" data-s="' + s.id + '">' + esc(s.n) + "</button>").join("") + "</div>";
     h += '<div class="sec2">学年</div><div class="chips wrap">' + gradesOf(d.pickS).map((g) => '<button type="button" class="chip' + (g === d.pickG ? " on" : "") + '" data-act="td-g" data-g="' + g + '">' + gradeName(g) + "</button>").join("") + "</div>";
     h += '<div class="sec2">単元（タップで追加）</div>';
@@ -611,7 +642,7 @@
   function draftFromTest(t) {
     const sc0 = (t.scope && t.scope[0]) || {};
     const g = sc0.g || prepGrade() || 7;
-    return { id: t.id, name: t.name || "", date: t.date, scope: (t.scope || []).map((x) => Object.assign({}, x)), pickS: sc0.s || "math", pickG: g, t: t.t };
+    return { id: t.id, name: t.name || "", date: t.date, scope: (t.scope || []).map((x) => Object.assign({}, x)), pickS: sc0.s || "math", pickG: g, t: t.t, system: t.system || "", kind: t.kind || "", examG: t.grade || ((g >= 7 && g <= 9) ? g : 7) };
   }
   function readDraftInputs() { if (!testDraft) return; const n = $("#tm-name"), d = $("#tm-date"); if (n) testDraft.name = n.value; if (d && d.value) testDraft.date = d.value; }
   function saveDraftTest() {
@@ -621,9 +652,18 @@
     if (daysUntil(d.date) < 0) { toast("テストの日は今日から先にしてね"); return; }
     if (!d.scope.length) { toast("範囲の単元を1つ以上えらんでね"); return; }
     const rec = { id: d.id || ("t" + now()), name: String(d.name || "").trim() || defaultTestName(d.scope), date: d.date, scope: d.scope.map((sc) => { const r = resolveScope(sc); return r || sc; }), t: now() };
+    if (d.system) rec.system = d.system;
+    if (d.kind) rec.kind = d.kind;
+    if (d.examG) rec.grade = d.examG;
     const all = testsArr();
     const i = all.findIndex((x) => x.id === rec.id);
-    if (i >= 0) { rec.lastMock = all[i].lastMock; all[i] = rec; } else all.push(rec);
+    if (i >= 0) {
+      rec.lastMock = all[i].lastMock;
+      if (!rec.system && all[i].system) rec.system = all[i].system;
+      if (!rec.kind && all[i].kind) rec.kind = all[i].kind;
+      if (!rec.grade && all[i].grade) rec.grade = all[i].grade;
+      all[i] = rec;
+    } else all.push(rec);
     save(); testDraft = null;
     modeNav = [{ v: "test" }, { v: "test-one", id: rec.id }];
     toast("テストを登録したよ"); render();
@@ -680,6 +720,369 @@
     $("#quiz").innerHTML = h; $("#quiz").scrollTop = 0;
     if (Q.baseCorrect) { confetti(mark === "ok" ? 60 : 24); sound(mark === "ok" ? "fanfare" : "soft"); }
   }
+
+  // ---------- v1.6.0 定期テスト（中間・期末） ----------
+  let EX = null, exTimer = null;
+  function examHistArr() { if (!Array.isArray(state.examHist)) state.examHist = []; return state.examHist; }
+  function examCoinMap() { if (!state.examCoin || typeof state.examCoin !== "object") state.examCoin = {}; return state.examCoin; }
+  function examDefaultGrade() { const g = prepGrade(); return g >= 7 && g <= 9 ? g : 7; }
+  function examUnits(s, g) { return (S()[s] || {})[g] || []; }
+  function examLabel(system, kind) { return (window.HMExam && HMExam.label(system, kind)) || ""; }
+  function examSpec(s) { return HMExam.specOf(s); }
+  function latestExam(s, g, system, kind) {
+    const rows = examHistArr().filter((h) => h.s === s && h.g === g && String(h.system) === String(system) && h.kind === kind).sort((a, b) => (a.t || 0) - (b.t || 0));
+    return rows.length ? rows[rows.length - 1] : null;
+  }
+  function fmtClock(sec) {
+    const t = Math.max(0, Math.floor(sec || 0)), m = Math.floor(t / 60), s = t % 60;
+    return m + ":" + String(s).padStart(2, "0");
+  }
+  function examScopeOf(system, kind, g, s, custom) {
+    if (custom && custom.length) return custom.map((x) => resolveScope(x) || x).filter((x) => x && x.s === s);
+    return HMExam.scopeItems(system, kind, g, s, examUnits(s, g));
+  }
+  function examCardSub() {
+    const rows = examHistArr();
+    if (!rows.length) return "中間・期末の問題用紙（100点）";
+    const last = rows[rows.length - 1];
+    return subjName(last.s, last.g) + " " + last.score + "点";
+  }
+  function viewExamHome() {
+    const top = modeNav[modeNav.length - 1] || {};
+    const g = (top.g >= 7 && top.g <= 9) ? top.g : examDefaultGrade();
+    const system = String(top.system || "3");
+    const terms = HMExam.termsOf(system);
+    let kind = top.kind || terms[0].id;
+    if (!terms.some((t) => t.id === kind)) kind = terms[0].id;
+    top.g = g; top.system = system; top.kind = kind;
+    const lab = examLabel(system, kind);
+    const tot = HMExam.totals(examHistArr(), g, system, kind);
+    let h = '<div class="ex-hero"><div class="eh-k">定期テスト</div><b>' + gradeName(g) + "の" + esc(lab) + "</b><small>実際の中間・期末に近い、100点満点の問題用紙だよ</small></div>";
+    h += '<div class="sec2">学年</div><div class="chips wrap">' + [7, 8, 9].map((x) => '<button type="button" class="chip' + (x === g ? " on" : "") + '" data-act="ex-g" data-g="' + x + '">' + gradeName(x) + "</button>").join("") + "</div>";
+    h += '<div class="sec2">学期のしくみ</div><div class="chips wrap"><button type="button" class="chip' + (system === "3" ? " on" : "") + '" data-act="ex-sys" data-sys="3">3学期制</button><button type="button" class="chip' + (system === "2" ? " on" : "") + '" data-act="ex-sys" data-sys="2">前期・後期</button></div>';
+    h += '<div class="sec2">テストの種類</div><div class="chips wrap">' + terms.map((t) => '<button type="button" class="chip' + (t.id === kind ? " on" : "") + '" data-act="ex-kind" data-kind="' + t.id + '">' + esc(t.n) + "</button>").join("") + "</div>";
+    if (tot.five.n || tot.nine.n) {
+      h += '<div class="ex-totals">';
+      h += examTotBox("5教科", tot.five, 500);
+      h += examTotBox("9教科", tot.nine, 900);
+      h += "</div>";
+    }
+    h += '<div class="sec2">教科をえらぶ</div><div class="list">';
+    HMExam.ALL9.forEach((s) => {
+      if (!HMExam.offersSubject(system, kind, s)) return;
+      const scope = examScopeOf(system, kind, g, s);
+      const last = latestExam(s, g, system, kind);
+      const spec = examSpec(s);
+      const sb = subjById(s);
+      h += '<button type="button" class="ex-sub" data-act="ex-open" data-s="' + s + '">' + HMIcons.icon(s, sb.c, 36) + '<span class="grow"><b>' + esc(subjName(s, g)) + "</b><small>" + scope.length + "単元 ・ " + spec.minutes + "分 ・ " + spec.max + "点満点</small></span><span class=\"ios-r\">" + (last ? last.score + "点" : "まだ") + "</span></button>";
+    });
+    h += "</div>";
+    h += '<button type="button" class="btn primary block" data-act="ex-reg">この範囲でテストを登録</button>';
+    h += '<button type="button" class="btn ghost block" data-act="ex-hist">履歴と点数の推移</button>';
+    return h;
+  }
+  function examTotBox(title, pack, full) {
+    let h = '<div class="ex-tot"><div class="k">' + title + '</div>';
+    if (!pack.n) h += '<div class="n">—</div><div class="yet">まだ</div>';
+    else {
+      h += '<div class="n">' + pack.score + " <small>/ " + pack.max + " 点</small></div>";
+      if (pack.n < pack.need) h += '<div class="yet">' + pack.n + " / " + pack.need + " 教科</div>";
+    }
+    return h + "</div>";
+  }
+  function viewExamScope() {
+    const top = modeNav[modeNav.length - 1] || {};
+    const s = top.s, g = top.g, system = String(top.system || "3"), kind = top.kind;
+    const us = examUnits(s, g);
+    if (!top.scope) top.scope = examScopeOf(system, kind, g, s);
+    if (top.timerOn == null) top.timerOn = true;
+    const lab = examLabel(system, kind);
+    const spec = examSpec(s);
+    let h = '<p class="lead">' + esc(gradeName(g) + " " + subjName(s, g) + "　" + lab) + "　" + spec.max + "点 ・ " + spec.minutes + "分</p>";
+    h += '<div class="sec2">範囲（タップで入れる・はずす）</div><div class="list">';
+    us.forEach((u, ui) => {
+      const on = top.scope.some((x) => x.s === s && x.g === g && x.ui === ui);
+      const r = unitRecord(s, g, ui);
+      h += '<button type="button" class="row-btn' + (on ? " picked" : "") + '" data-act="ex-tog" data-ui="' + ui + '"><span class="un">' + (on ? "✓" : (ui + 1)) + '</span><span class="grow"><b>' + esc(u.n) + "</b></span>" + (r ? markLabel(r.mark, r.pct) : "") + "</button>";
+    });
+    h += "</div>";
+    h += '<div class="sec2">タイマー</div><div class="chips wrap">';
+    h += '<button type="button" class="chip' + (top.timerOn ? " on" : "") + '" data-act="ex-timer" data-on="1">使う（' + spec.minutes + '分）</button>';
+    h += '<button type="button" class="chip' + (!top.timerOn ? " on" : "") + '" data-act="ex-timer" data-on="0">使わない</button></div>';
+    h += '<div class="actions"><button type="button" class="btn primary block" data-act="ex-start">問題用紙をひらく</button></div>';
+    return h;
+  }
+  function viewExamHist() {
+    const top = modeNav[modeNav.length - 1] || {};
+    const g = (top.g >= 7 && top.g <= 9) ? top.g : examDefaultGrade();
+    const s = top.s || "";
+    const all = examHistArr().filter((h) => h.g === g && (!s || h.s === s)).slice().reverse();
+    let h = '<div class="sec2">学年</div><div class="chips wrap">' + [7, 8, 9].map((x) => '<button type="button" class="chip' + (x === g ? " on" : "") + '" data-act="ex-hist-g" data-g="' + x + '">' + gradeName(x) + "</button>").join("") + "</div>";
+    h += '<div class="sec2">教科</div><div class="chips wrap">' + ['<button type="button" class="chip' + (!s ? " on" : "") + '" data-act="ex-hist-s" data-s="">すべて</button>'].concat(HMExam.ALL9.map((id) => '<button type="button" class="chip' + (id === s ? " on" : "") + '" data-act="ex-hist-s" data-s="' + id + '">' + esc(subjName(id, g)) + "</button>")).join("") + "</div>";
+    const chartRows = (s ? examHistArr().filter((h) => h.g === g && h.s === s) : examHistArr().filter((h) => h.g === g && HMExam.isMain(h.s))).slice(-12);
+    h += '<div class="ex-chart">' + examChartSvg(chartRows, s ? subjName(s, g) : "5教科") + "</div>";
+    h += '<div class="sec2">履歴</div>';
+    if (!all.length) h += '<p class="lead soft">まだ記録はないよ。受けたテストが、ここに残るよ。</p>';
+    else {
+      h += '<div class="list ex-hist">';
+      all.slice(0, 40).forEach((r) => {
+        const mark = markOf(r.max ? Math.round(100 * r.score / r.max) : 0);
+        h += '<div class="row-btn"><span class="grow"><b>' + esc(subjName(r.s, r.g)) + "　" + esc(r.name || examLabel(r.system, r.kind)) + "</b><small>" + esc(new Date(r.t).toLocaleDateString("ja-JP")) + " ・ " + r.okN + "/" + r.n + " 問</small></span>" + markLabel(mark, r.max ? Math.round(100 * r.score / r.max) : 0) + "<b class=\"num\">" + r.score + "</b></div>";
+      });
+      h += "</div>";
+    }
+    return h;
+  }
+  function examChartSvg(rows, title) {
+    const w = 320, h = 168, padL = 28, padR = 10, padT = 16, padB = 28;
+    let out = '<div class="k" style="font-size:12px;font-weight:800;padding:0 8px 4px">' + esc(title) + "の点数の推移</div>";
+    if (!rows.length) return out + '<p class="lead soft" style="padding:8px">まだグラフになる記録はないよ。</p>';
+    const pcts = rows.map((r) => r.max ? Math.round(100 * r.score / r.max) : 0);
+    const xs = rows.map((_, i) => padL + (rows.length === 1 ? (w - padL - padR) / 2 : i * (w - padL - padR) / (rows.length - 1)));
+    const y = (v) => padT + (100 - v) / 100 * (h - padT - padB);
+    const line = xs.map((x, i) => (i ? "L" : "M") + x.toFixed(1) + "," + y(pcts[i]).toFixed(1)).join(" ");
+    let svg = '<svg viewBox="0 0 ' + w + " " + h + '" role="img" aria-label="点数の推移">';
+    [0, 50, 100].forEach((v) => { svg += '<line class="grid" x1="' + padL + '" x2="' + (w - padR) + '" y1="' + y(v) + '" y2="' + y(v) + '"/><text x="2" y="' + (y(v) + 3) + '">' + v + "</text>"; });
+    svg += '<path class="line" d="' + line + '"/>';
+    xs.forEach((x, i) => { svg += '<circle cx="' + x.toFixed(1) + '" cy="' + y(pcts[i]).toFixed(1) + '" r="3.5"/>'; });
+    svg += "</svg>";
+    return out + svg;
+  }
+  function examPaperable(q) {
+    if (q && (q.t === "mc" || q.t === "ty") && !q.listen) return true;
+    return paperable(q);
+  }
+  function examQHtml(q) {
+    const s = String(q.q || "");
+    if (/<[a-z/]/i.test(s)) return s;
+    return fracHtml(s);
+  }
+  function gradeExamGiven(q, given) {
+    if (q.t === "mc") return { ok: given != null && given !== "" && String(given) === String(q.a), empty: given == null || given === "" };
+    if (q.t === "ty") {
+      if (given == null || String(given).trim() === "") return { ok: false, empty: true };
+      if (window.E4 && E4.judgeText) {
+        const r = E4.judgeText(String(given), q.acc || [q.a]);
+        return { ok: !!(r && r.ok), empty: !!r.empty };
+      }
+      const norm = (s) => String(s).trim().toLowerCase().replace(/\s+/g, " ");
+      return { ok: (q.acc || [q.a]).some((a) => norm(a) === norm(given)) };
+    }
+    return gradeColorGiven(q, given);
+  }
+  function examPool(scope, want) { return (collectScopeQuestions(scope, want || 240) || []).filter(examPaperable); }
+  function examFill(s, g, scope) {
+    const used = new Set((scope || []).map((x) => x.ui));
+    const extra = examUnits(s, g).map((u, ui) => used.has(ui) ? null : { s, g, ui, un: u.n }).filter(Boolean);
+    return examPool(extra, 160);
+  }
+  function startExamPaper(opts) {
+    const s = opts.s, g = opts.g, system = String(opts.system || "3"), kind = opts.kind;
+    const scope = (opts.scope && opts.scope.length) ? opts.scope : examScopeOf(system, kind, g, s);
+    if (!scope.length) { toast("範囲の単元を1つ以上えらんでね"); return; }
+    const pool = examPool(scope, 240), fill = examFill(s, g, scope);
+    const paper = HMExam.buildPaper(s, pool, fill);
+    if (!paper.n) { toast("この範囲では問題を作れなかったよ"); return; }
+    paper.qs.forEach((q) => { if (q.t === "ch" || q.t === "mc") q.opts = HM.U.shuf((q.opts || [q.a].concat(q.o || [])).slice()); });
+    const name = opts.name || (gradeName(g) + " " + subjName(s, g) + "　" + examLabel(system, kind));
+    EX = { s, g, system, kind, name, scope, paper, ans: [], timerOn: !!opts.timerOn, remain: paper.minutes * 60, timeUp: false, graded: false, started: false, testId: opts.testId || "", coins: 0, rec: null };
+    Q = { mode: "exam", backNav: modeNav.slice(), s, g, ui: null, si: null };
+    $("#quiz").hidden = false; document.body.classList.add("in-quiz");
+    renderExamIntro();
+  }
+  function renderExamIntro() {
+    const p = drillPartner(), spec = EX.paper;
+    const tline = EX.timerOn ? (spec.minutes + "分のタイマーつき") : "タイマーなし";
+    $("#quiz").innerHTML = '<div class="sum mock-intro"><div class="mock-badge">📝 定期テスト</div><h2>' + esc(EX.name) + "</h2><p class=\"lead\">" + spec.n + " 問 ・ " + spec.max + "点満点 ・ " + tline + '</p><div class="sum-char">' + charHtml(p.id, 110, "bob r" + p.rarity) + '<div class="bubble">本番のつもりで、いってみよう！</div></div><div class="sum-act"><button type="button" class="btn primary block" data-ex="go">はじめる</button><button type="button" class="btn ghost block" data-q="quit">もどる</button></div></div>';
+    $("#quiz").scrollTop = 0;
+  }
+  function clearExTimer() { if (exTimer) { clearInterval(exTimer); exTimer = null; } }
+  function startExTimer() {
+    clearExTimer();
+    if (!EX || !EX.timerOn) return;
+    exTimer = setInterval(() => {
+      if (!EX || EX.graded || !EX.timerOn) { clearExTimer(); return; }
+      EX.remain--;
+      const el = $("#ex-clock");
+      if (el) { el.textContent = fmtClock(Math.max(0, EX.remain)); el.classList.toggle("warn", EX.remain <= 60); }
+      if (EX.remain <= 0) {
+        EX.remain = 0; EX.timeUp = true; clearExTimer();
+        const b = $("#ex-timeup"); if (b) b.hidden = false;
+      }
+    }, 1000);
+  }
+  function readExamInputs() {
+    if (!EX) return;
+    $$("[data-ex-in]").forEach((inp) => { EX.ans[+inp.getAttribute("data-ex-in")] = inp.value; });
+  }
+  function renderExamPaper() {
+    const paper = EX.paper, graded = !!EX.graded;
+    let h = '<div class="ex-sheet"><div class="ex-bar"><button type="button" class="ct-x" data-q="quit" aria-label="やめる">✕</button>';
+    if (EX.timerOn) h += '<span class="ex-clock' + (EX.remain <= 60 ? " warn" : "") + '" id="ex-clock">' + fmtClock(Math.max(0, EX.remain)) + "</span>";
+    h += "</div>";
+    h += '<div id="ex-timeup" class="ex-timeup"' + (EX.timeUp && !graded ? "" : " hidden") + ">時間になったよ。採点する？</div>";
+    h += '<div class="ex-paper"><div class="ex-head"><div class="ex-brand">ほしの学園　定期テスト</div><div class="ex-title">' + esc(EX.name) + "</div>";
+    h += '<div class="ex-row"><span class="ex-meta">' + esc(gradeName(EX.g) + "　" + subjName(EX.s, EX.g)) + "　" + paper.n + '問</span><span class="ex-scorebox">得点　<b>' + (graded ? EX.rec.score : "　") + '</b> / ' + paper.max + '</span></div></div>';
+    let qi = 0;
+    paper.parts.forEach((part) => {
+      if (!part.qs.length) return;
+      h += '<div class="ex-part"><h3>' + esc(part.n) + "</h3><div class=\"ep-sub\">各問 " + part.pts + "点　（" + part.max + "点）</div>";
+      part.qs.forEach((q) => {
+        const idx = qi++, given = EX.ans[idx] == null ? "" : String(EX.ans[idx]);
+        const res = graded ? gradeExamGiven(q, given) : null;
+        h += '<div class="ex-q' + (graded ? " graded" : "") + '"><div class="eq-n">問' + (idx + 1) + "（" + q.pts + "点）</div>";
+        if (graded) h += '<span class="ex-mark">' + (res.ok ? "◯" : "×") + "</span>";
+        h += '<div class="eq-q">' + examQHtml(q) + "</div>";
+        if (q.t === "ch" || q.t === "tf" || q.t === "mc" || ((q.opts || q.o) && q.t !== "ty")) {
+          const opts = q.opts || (q.t === "tf" ? ["○", "×"] : [q.a].concat(q.o || []));
+          const seen = {};
+          opts.forEach((o) => {
+            if (o == null || seen[o]) return; seen[o] = 1;
+            const on = given === String(o);
+            h += '<button type="button" class="ex-opt' + (on ? " on" : "") + (graded && String(o) === String(q.a) ? " right" : "") + (graded && on && String(o) !== String(q.a) ? " wrong" : "") + '" data-ex="pick" data-i="' + idx + '" data-v="' + esc(String(o)) + '" ' + (graded ? "disabled" : "") + ">" + fracHtml(esc(String(o))) + "</button>";
+          });
+        } else {
+          h += '<div class="ct-num"><input class="ex-in" data-ex-in="' + idx + '" inputmode="' + (q.t === 'ty' ? 'text' : 'decimal') + '" autocomplete="off" autocapitalize="off" spellcheck="false" value="' + esc(given) + '" ' + (graded ? "readonly" : "") + ' placeholder="こたえ"></div>';
+        }
+        h += "</div>";
+      });
+      h += "</div>";
+    });
+    h += "</div>";
+    if (!graded) h += '<div class="ex-foot"><button type="button" class="btn primary block" data-ex="grade">採点する（' + paper.max + "点満点）</button></div>";
+    else h += '<div class="ex-foot"><button type="button" class="btn primary block" data-ex="result">結果を見る</button></div>';
+    h += "</div>";
+    const prevY = (EX.started && $("#quiz").scrollTop) || 0;
+    $("#quiz").innerHTML = h; $("#quiz").scrollTop = EX.graded ? 0 : prevY;
+    $$("[data-ex-in]").forEach((inp) => {
+      const sync = () => { EX.ans[+inp.getAttribute("data-ex-in")] = inp.value; };
+      inp.addEventListener("input", sync); inp.addEventListener("change", sync);
+    });
+    if (!graded && EX.timerOn && EX.started) startExTimer();
+  }
+  function gradeExam() {
+    if (!EX || EX.graded) return;
+    readExamInputs();
+    clearExTimer();
+    const paper = EX.paper;
+    let score = 0, okN = 0;
+    const partScores = paper.parts.map((p) => ({ i: p.i, n: p.n, score: 0, max: p.max }));
+    const miss = [], seenU = {};
+    paper.qs.forEach((q, i) => {
+      const r = gradeExamGiven(q, EX.ans[i]);
+      if (r.ok) { score += q.pts; okN++; partScores[q.part].score += q.pts; }
+      else if (q.__src) {
+        const k = q.__src.s + "|" + q.__src.g + "|" + q.__src.ui;
+        if (!seenU[k]) { seenU[k] = 1; miss.push({ s: q.__src.s, g: q.__src.g, ui: q.__src.ui, un: q.__src.un }); }
+      }
+    });
+    EX.graded = true; EX.okN = okN;
+    const rec = { t: now(), s: EX.s, g: EX.g, system: EX.system, kind: EX.kind, name: EX.name, score, max: paper.max, okN, n: paper.n, parts: partScores, miss, testId: EX.testId || "" };
+    examHistArr().push(rec);
+    if (examHistArr().length > 200) state.examHist = examHistArr().slice(-200);
+    const ck = examCoinMap(), dayK = [EX.kind, EX.g, EX.s, today()].join("|");
+    let coins = 0;
+    if (!ck[dayK] && okN) { ck[dayK] = 1; coins = grantQuiet(okN); }
+    EX.coins = coins; EX.rec = rec;
+    save();
+    renderExamResult();
+  }
+  function renderExamResult() {
+    const rec = EX.rec, max = rec.max, pct = max ? Math.round(100 * rec.score / max) : 0, mark = markOf(pct);
+    const tot = HMExam.totals(examHistArr(), EX.g, EX.system, EX.kind);
+    const p = drillPartner();
+    const line = pct >= 100 ? "100点！ 花丸だね！" : pct >= 90 ? "すばらしい！ 花丸だよ！" : pct >= 60 ? "いい調子！ にがてなところを復習して、もう一度やってみよう！" : "ここから伸びるよ。まちがえた単元を復習してみよう！";
+    let h = '<div class="ex-result">';
+    if (pct >= 90) h += '<div class="ct-hana' + (pct >= 100 ? " perfect" : "") + '"><span>花丸</span></div>';
+    h += '<div class="ex-score-hero"><div class="k">定期テストの結果</div><div class="n"><b>' + rec.score + "</b><small> / " + max + " 点</small></div>" + markLabel(mark, pct) + "</div>";
+    h += '<div class="ex-parts">';
+    rec.parts.forEach((p2) => { if (p2.max) h += "<div><b>" + esc(p2.n) + "</b><span>" + p2.score + " / " + p2.max + " 点</span></div>"; });
+    h += "<div><b>正解</b><span>" + rec.okN + " / " + rec.n + " 問</span></div></div>";
+    if (tot.five.n) h += '<div class="ex-totals">' + examTotBox("5教科", tot.five, 500) + examTotBox("9教科", tot.nine, 900) + "</div>";
+    if (EX.coins) h += '<p class="ct-coin">🪙 +' + EX.coins + " コイン（今日この教科の1回目）</p>";
+    if (rec.miss && rec.miss.length) {
+      h += '<div class="sec2">まちがえた問題の復習</div><div class="ex-rev">';
+      rec.miss.forEach((u) => { h += '<button type="button" data-ex="review" data-s="' + u.s + '" data-g="' + u.g + '" data-ui="' + u.ui + '">' + esc(u.un) + "</button>"; });
+      h += "</div>";
+    }
+    h += '<div class="sum-char">' + charHtml(p.id, 100, "bob r" + p.rarity) + '<div class="bubble">' + esc(line) + "</div></div>";
+    const chartRows = examHistArr().filter((r) => r.s === EX.s && r.g === EX.g).slice(-12);
+    h += '<div class="ex-chart">' + examChartSvg(chartRows, subjName(EX.s, EX.g)) + "</div>";
+    h += '<div class="sum-act"><button type="button" class="btn primary block" data-ex="review-paper">赤ペンの答案を見る</button><button type="button" class="btn ghost block" data-ex="again">もう一度受ける</button><button type="button" class="btn ghost block" data-q="quit">もどる</button></div></div>';
+    $("#quiz").innerHTML = h; $("#quiz").scrollTop = 0;
+    if (pct >= 90) { confetti(pct >= 100 ? 80 : 50); sound("fanfare"); } else if (rec.score) sound("soft");
+  }
+  function startExamAgain() {
+    const cur = EX;
+    startExamPaper({ s: cur.s, g: cur.g, system: cur.system, kind: cur.kind, name: cur.name, scope: cur.scope, timerOn: cur.timerOn, testId: cur.testId });
+  }
+  function handleExam(act, el) {
+    if (act === "go") {
+      if (!EX) return true;
+      EX.started = true;
+      if (EX.timerOn) EX.remain = EX.paper.minutes * 60;
+      renderExamPaper();
+      return true;
+    }
+    if (!EX) return false;
+    if (act === "pick") {
+      if (EX.graded) return true;
+      EX.ans[+el.dataset.i] = el.dataset.v;
+      renderExamPaper();
+      return true;
+    }
+    if (act === "grade") { gradeExam(); return true; }
+    if (act === "result") { renderExamResult(); return true; }
+    if (act === "review-paper") { renderExamPaper(); return true; }
+    if (act === "again") { startExamAgain(); return true; }
+    if (act === "review") {
+      const s = el.dataset.s, g = +el.dataset.g, ui = +el.dataset.ui;
+      quitQuiz();
+      goUnit(s, g, ui);
+      return true;
+    }
+    return false;
+  }
+  function registerExamTest() {
+    const top = modeNav.find((x) => x.v === "exam") || modeNav[modeNav.length - 1] || {};
+    const g = top.g || examDefaultGrade(), system = String(top.system || "3"), kind = top.kind;
+    const lab = examLabel(system, kind);
+    const scope = HMExam.allScope(system, kind, g, examUnits);
+    if (!scope.length) { toast("この回の範囲はまだないよ"); return; }
+    testDraft = newDraft();
+    testDraft.name = gradeName(g) + "の" + lab;
+    testDraft.scope = scope;
+    testDraft.pickS = scope[0].s;
+    testDraft.pickG = g;
+    testDraft.system = system;
+    testDraft.kind = kind;
+    testDraft.examG = g;
+    modeNav = [{ v: "test" }, { v: "test-new" }];
+    navDir = "fwd";
+    render(); window.scrollTo(0, 0);
+  }
+  function applyPresetToDraft() {
+    readDraftInputs();
+    const d = testDraft; if (!d) return;
+    const g = (d.examG >= 7 && d.examG <= 9) ? d.examG : ((d.pickG >= 7 && d.pickG <= 9) ? d.pickG : 7);
+    const system = String(d.system || "3");
+    const terms = HMExam.termsOf(system);
+    let kind = d.kind || terms[0].id;
+    if (!terms.some((t) => t.id === kind)) kind = terms[0].id;
+    d.examG = g; d.system = system; d.kind = kind; d.pickG = g;
+    d.scope = HMExam.allScope(system, kind, g, examUnits);
+    if (!String(d.name || "").trim()) d.name = gradeName(g) + "の" + examLabel(system, kind);
+    toast("範囲を入れたよ（" + d.scope.length + "単元）");
+    render();
+  }
+  function startExamFromTest(test, s) {
+    const scope = (test.scope || []).map((x) => resolveScope(x) || x).filter((x) => x && x.s === s);
+    if (!scope.length) { toast("この教科の範囲はないよ"); return; }
+    const g = scope[0].g;
+    const system = test.system || "3", kind = test.kind || "";
+    startExamPaper({ s, g, system, kind, name: testNameOf(test) + "　" + subjName(s, g), scope, timerOn: true, testId: test.id });
+  }
+
 
   // ---------- v1.4.0 カラーテスト・漢字50問 ----------
   const CT_OMOTE_N = 10, CT_URA_N = 5, CT_OMOTE_PT = 5, CT_URA_PT = 10; // 10*5 + 5*10 = 100
@@ -1159,7 +1562,8 @@
     return b ? gradeName(g) + " ベスト " + b.best + "点" : gradeName(g) + "　読みと書き　50問";
   }
   function homeDrillHtml() {
-    return '<div class="drill2">' +
+    return '<button type="button" class="drill-card exam" data-act="mode-exam"><span class="mc-ico">📝</span><b>定期テスト</b><small>' + esc(examCardSub()) + "</small></button>" +
+      '<div class="drill2">' +
       '<button type="button" class="drill-card color" data-act="mode-color"><span class="mc-ico">🖍️</span><b>カラーテスト</b><small>' + esc(colorCardSub()) + "</small></button>" +
       '<button type="button" class="drill-card kj" data-act="mode-kj"><span class="mc-ico">🈶</span><b>漢字50問</b><small>' + esc(kjCardSub()) + "</small></button>" +
       "</div>";
@@ -1177,7 +1581,7 @@
     }
     if (top.v === "units") {
       const us = S()[top.s][top.g];
-      return { title: subjName(top.s, top.g) + " " + gradeName(top.g), html: '<p class="lead">単元をえらぼう</p>' + markLegend() + '<div class="list">' + us.map((u, ui) => { const r = unitStats(top.s, top.g, ui); const mk = unitRecord(top.s, top.g, ui); const ct = top.g >= 7 ? colorRec(top.s, top.g, u.n) : null; return '<button type="button" class="row-btn unit-row" data-unit="' + ui + '"><span class="un">' + (ui + 1) + '</span><span class="grow"><b>' + esc(u.n) + '</b><span class="small muted">' + r.total + "ステップ ・ 合格 " + r.done + (ct ? " ・ テスト " + ct.best + "点" : "") + "</span>" + bar(r.done, r.total) + "</span>" + markLabel(mk.mark, mk.pct) + "</button>"; }).join("") + "</div>" };
+      return { title: subjName(top.s, top.g) + " " + gradeName(top.g), html: '<div class="units-page"><p class="lead">単元をえらぼう</p>' + markLegend() + '<div class="list">' + us.map((u, ui) => { const r = unitStats(top.s, top.g, ui); const mk = unitRecord(top.s, top.g, ui); const ct = top.g >= 7 ? colorRec(top.s, top.g, u.n) : null; return '<button type="button" class="row-btn unit-row" data-unit="' + ui + '"><span class="un">' + (ui + 1) + '</span><span class="grow"><b>' + esc(u.n) + '</b><span class="small muted">' + r.total + "ステップ ・ 合格 " + r.done + (ct ? " ・ テスト " + ct.best + "点" : "") + "</span>" + bar(r.done, r.total) + "</span>" + markLabel(mk.mark, mk.pct) + "</button>"; }).join("") + "</div></div>" };
     }
     if (top.v === "steps") {
       const u = S()[top.s][top.g][top.u], tk = dayRec(today()).steps, sb = subjById(top.s);
@@ -1709,6 +2113,12 @@
     $("#quiz").hidden = true; $("#quiz").innerHTML = ""; document.body.classList.remove("in-quiz");
     try { if (canSpeak()) speechSynthesis.cancel(); } catch (e) {}
     if (KJ && KJ._pad && KJ._pad.cleanup) try { KJ._pad.cleanup(); } catch (e) {}
+    clearExTimer();
+    if (Q && Q.mode === "exam") {
+      const back = Q.backNav; EX = null; Q = null;
+      if (back) { tab = "home"; modeNav = back; navDir = "back"; }
+      render(); return;
+    }
     if (Q && (Q.mode === "color" || Q.mode === "kj50")) {
       const back = Q.backNav; CT = null; KJ = null; Q = null;
       if (back) { tab = "home"; modeNav = back; navDir = "back"; }
@@ -2027,7 +2437,7 @@
     return h;
   }
   function openAbout() {
-    openSheet('<h2>ほしの学園 <small class="muted">v' + VERSION + '</small></h2><p>小1〜中3の算数・数学、国語（漢字の書き練習）、生活、理科、社会、英語と、中学の技術・家庭・音楽・美術・保健体育。学習指導要領（平成29年告示）の内容にそって作っています。</p><p>⭐は1ステップ6割以上（切り上げ）で1こ（同じステップは1日1回）。⭐4こで、その日のゲームがひらきます。⭐はへりません。なかまや着せかえは見た目だけのごほうびです。</p><p><b>データの保存</b>：ログインしないときは、この端末の中（ブラウザ）にだけ保存します。ログインすると、記録を Firebase に保存して、ほかの端末と同期します。</p><p class="small muted">算数・数学の問題はプログラムで作り、答えを別の計算で確かめています。まちがいを見つけたら「この問題おかしい？」で教えてください。</p><p class="small legal-links"><a href="./privacy.html">プライバシーポリシー</a> ・ <a href="./terms.html">利用規約</a> ・ <a href="./legal.html">ライセンス・表記</a></p>', { label: "バージョン情報" });
+    openSheet('<h2>ほしの学園 <small class="muted">v' + VERSION + '</small></h2><p>小1〜中3の算数・数学、国語（漢字の書き練習）、生活、理科、社会、英語と、中学の技術・家庭・音楽・美術・保健体育。学習指導要領（平成29年告示）の内容にそって作っています。中学の中間・期末に合わせた100点満点の定期テストも用意しています。</p><p>⭐は1ステップ6割以上（切り上げ）で1こ（同じステップは1日1回）。⭐4こで、その日のゲームがひらきます。⭐はへりません。なかまや着せかえは見た目だけのごほうびです。</p><p><b>データの保存</b>：ログインしないときは、この端末の中（ブラウザ）にだけ保存します。ログインすると、記録を Firebase に保存して、ほかの端末と同期します。</p><p class="small muted">算数・数学の問題はプログラムで作り、答えを別の計算で確かめています。まちがいを見つけたら「この問題おかしい？」で教えてください。</p><p class="small legal-links"><a href="./privacy.html">プライバシーポリシー</a> ・ <a href="./terms.html">利用規約</a> ・ <a href="./legal.html">ライセンス・表記</a></p>', { label: "バージョン情報" });
   }
   function openProfile() {
     const st = state.settings;
@@ -2080,7 +2490,8 @@
     if (t.closest("#quiz")) {
       const ctEl = t.closest("[data-ct]"); if (ctEl && handleColor(ctEl.dataset.ct, ctEl)) return;
       const kjEl = t.closest("[data-kj]"); if (kjEl && handleKj(kjEl.dataset.kj, kjEl)) return;
-      if (Q && (Q.mode === "color" || Q.mode === "kj50")) {
+      const exEl = t.closest("[data-ex]"); if (exEl && handleExam(exEl.dataset.ex, exEl)) return;
+      if (Q && (Q.mode === "color" || Q.mode === "kj50" || Q.mode === "exam")) {
         const a = t.closest("[data-q]"); if (a && a.dataset.q === "quit") quitQuiz();
         return;
       }
@@ -2179,6 +2590,23 @@
       else if (a === "mock-start") { const t2 = testsArr().find((x) => x.id === ac.dataset.id); if (t2) startMock(t2); }
       else if (a === "mode-color") { modeNav = [{ v: "color", s: "math", g: (prepGrade() >= 7 ? prepGrade() : 7) }]; navDir = "fwd"; render(); window.scrollTo(0, 0); }
       else if (a === "mode-kj") { modeNav = [{ v: "kj", g: kjGrade() }]; navDir = "fwd"; render(); window.scrollTo(0, 0); }
+      else if (a === "mode-exam") { modeNav = [{ v: "exam", g: examDefaultGrade(), system: "3", kind: "mid1" }]; navDir = "fwd"; render(); window.scrollTo(0, 0); }
+      else if (a === "ex-g") { const top = modeNav[modeNav.length - 1]; if (top) { top.g = +ac.dataset.g; if (top.v === "exam-scope") top.scope = null; } render(); }
+      else if (a === "ex-sys") { const top = modeNav.find((x) => x.v === "exam") || modeNav[modeNav.length - 1]; if (top) { top.system = ac.dataset.sys; const terms = HMExam.termsOf(top.system); if (!terms.some((x) => x.id === top.kind)) top.kind = terms[0].id; } render(); }
+      else if (a === "ex-kind") { const top = modeNav.find((x) => x.v === "exam") || modeNav[modeNav.length - 1]; if (top) top.kind = ac.dataset.kind; render(); }
+      else if (a === "ex-open") { const root = modeNav.find((x) => x.v === "exam") || { v: "exam", g: examDefaultGrade(), system: "3", kind: "mid1" }; modeNav = [root, { v: "exam-scope", s: ac.dataset.s, g: root.g, system: root.system, kind: root.kind }]; navDir = "fwd"; render(); window.scrollTo(0, 0); }
+      else if (a === "ex-tog") { const top = modeNav[modeNav.length - 1]; if (!top || top.v !== "exam-scope") return; const ui = +ac.dataset.ui, s = top.s, g = top.g, us = examUnits(s, g); if (!top.scope) top.scope = []; const i = top.scope.findIndex((x) => x.ui === ui); if (i >= 0) top.scope.splice(i, 1); else top.scope.push({ s, g, ui, un: us[ui].n }); render(); }
+      else if (a === "ex-timer") { const top = modeNav[modeNav.length - 1]; if (top) top.timerOn = ac.dataset.on === "1"; render(); }
+      else if (a === "ex-start") { const top = modeNav[modeNav.length - 1]; startExamPaper({ s: top.s, g: top.g, system: top.system, kind: top.kind, scope: top.scope, timerOn: top.timerOn !== false }); }
+      else if (a === "ex-reg") registerExamTest();
+      else if (a === "ex-hist") { const root = modeNav.find((x) => x.v === "exam") || { v: "exam", g: examDefaultGrade(), system: "3", kind: "mid1" }; modeNav = [root, { v: "exam-hist", g: root.g, s: "" }]; navDir = "fwd"; render(); window.scrollTo(0, 0); }
+      else if (a === "ex-hist-g") { const top = modeNav[modeNav.length - 1]; if (top) top.g = +ac.dataset.g; render(); }
+      else if (a === "ex-hist-s") { const top = modeNav[modeNav.length - 1]; if (top) top.s = ac.dataset.s; render(); }
+      else if (a === "ex-from-test") { const t2 = testsArr().find((x) => x.id === ac.dataset.id); if (t2) startExamFromTest(t2, ac.dataset.s); }
+      else if (a === "td-sys") { readDraftInputs(); if (testDraft) { testDraft.system = ac.dataset.sys; const terms = HMExam.termsOf(testDraft.system); if (!terms.some((x) => x.id === testDraft.kind)) testDraft.kind = terms[0].id; } render(); }
+      else if (a === "td-kind") { readDraftInputs(); if (testDraft) testDraft.kind = ac.dataset.kind; render(); }
+      else if (a === "td-exam-g") { readDraftInputs(); if (testDraft) testDraft.examG = +ac.dataset.g; render(); }
+      else if (a === "td-preset") applyPresetToDraft();
       else if (a === "ct-g") { const cur = modeNav[modeNav.length - 1]; if (cur && cur.v === "color") { cur.g = +ac.dataset.g; const gs = gradesOf(cur.s || "math"); if (!gs.includes(cur.g)) { const f = SUBJ.find((x) => x.id !== "life" && gradesOf(x.id).includes(cur.g)); if (f) cur.s = f.id; } render(); } }
       else if (a === "ct-s") { const cur = modeNav[modeNav.length - 1]; if (cur && cur.v === "color") { cur.s = ac.dataset.s; render(); } }
       else if (a === "ct-start") { startColorTest(ac.dataset.s, +ac.dataset.g, +ac.dataset.ui); }
