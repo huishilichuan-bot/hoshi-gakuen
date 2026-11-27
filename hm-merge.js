@@ -52,6 +52,15 @@
     return out;
   }
   // 利用のようす（日ごと）：同じ日は項目ごとに大きい方（ふたつの端末で同じ記録を二重に数えない）
+  function mergeTests(a, b) {
+    const m = new Map();
+    for (const it of [...arr(a), ...arr(b)]) {
+      if (!it || !it.id) continue;
+      const prev = m.get(it.id);
+      if (!prev || num(it.t) >= num(prev.t)) m.set(it.id, it);
+    }
+    return [...m.values()].sort((x, y) => String(x.date).localeCompare(String(y.date)) || num(x.t) - num(y.t)).slice(-30);
+  }
   function mergeUse(a, b) {
     const out = {};
     for (const k of new Set([...Object.keys(obj(a)), ...Object.keys(obj(b))])) {
@@ -84,7 +93,7 @@
   // まだ何もしていない端末（はじめて開いただけ）の記録か
   function isBlank(st) {
     const days = Object.values(obj(st.days));
-    return !num(obj(obj(st.gk).coins).e) && !obj(st.gk).partner && !num(st.totalStars) && !num(st.pullsUsed) && !Object.keys(obj(st.progress)).length && !arr(st.wrongBox).length && !num(st.bestCombo) && !Object.keys(obj(st.chars)).some((k) => k !== "mori") && !Object.keys(obj(st.bossWins)).length && days.every((d) => !Object.keys(obj(d.steps)).length) && !(obj(st.settings).nick);
+    return !num(obj(obj(st.gk).coins).e) && !obj(st.gk).partner && !num(st.totalStars) && !num(st.pullsUsed) && !Object.keys(obj(st.progress)).length && !arr(st.wrongBox).length && !num(st.bestCombo) && !Object.keys(obj(st.chars)).some((k) => k !== "mori") && !Object.keys(obj(st.bossWins)).length && days.every((d) => !Object.keys(obj(d.steps)).length) && !(obj(st.settings).nick) && !arr(st.tests).length;
   }
   // 設定は新しい方を使い、空の項目（名前など）はもう一方でうめる
   function fillSettings(newer, older) {
@@ -125,6 +134,7 @@
     out.last = newer.last || L.last || C.last || null;
     out.use = mergeUse(L.use, C.use);
     out.gk = mergeGK(L.gk, C.gk, newer === C);
+    out.tests = mergeTests(L.tests, C.tests);
     out.lastActive = max(L.lastActive, C.lastActive);
     if (L.acct || C.acct) out.acct = obj(newer.acct).uid ? newer.acct : L.acct || C.acct;
     out.updatedAt = Math.max(num(L.updatedAt), num(C.updatedAt));

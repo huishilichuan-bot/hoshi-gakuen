@@ -1,7 +1,7 @@
 /* ほしの学園 — 勉強して⭐を集める学習アプリ（小1〜中3）。課金・お金の機能はありません。 */
 (() => {
   "use strict";
-  const VERSION = "1.2.0";
+  const VERSION = "1.3.0";
   // 記録はプロフィールごとに分けて保存：ゲスト＝"hoshigakuen"、アカウント＝"hoshigakuen:u:<uid>"（ログアウトで消す）
   const GUEST_KEY = "hoshigakuen";
   let KEY = GUEST_KEY;
@@ -72,7 +72,7 @@
   function fresh() {
     return { schema: SCHEMA, created: now(), settings: { sound: true, haptic: true, nick: "", vol: 0.8, bgm: true, bgmVol: 0.5, remind: false, remindAt: "17:00", fs: "m", rmotion: false, grade: 0, hint: true }, days: {}, totalStars: 0, pulls: 0, pullsUsed: 0,
       chars: { mori: { n: 1, shards: 0, star: 0, t: now() } }, partner: "mori", look: { bg: "note", maru: "red", title: "first" },
-      progress: {}, last: null, reports: [], gachaLog: [], games: {}, wrongBox: [], boxGone: {}, bossWins: {}, boxCleared: 0, bestCombo: 0, use: {}, gk: {} };
+      progress: {}, last: null, reports: [], gachaLog: [], games: {}, wrongBox: [], boxGone: {}, bossWins: {}, boxCleared: 0, bestCombo: 0, use: {}, gk: {}, tests: [] };
   }
   function migrate(s) {
     if (!s || typeof s !== "object") return fresh();
@@ -242,7 +242,17 @@
   let tab = "home";
   let navDir = "tab";
   let nav = []; // 勉強タブの中の階層 [{v:"grades",s}, {v:"units",s,g}, {v:"steps",s,g,u}]
-  function setTab(t) { if (t === tab && t === "study" && nav.length) { nav = []; navDir = "back"; } else navDir = "tab"; tab = t; if (t !== "study") nav = []; render(); window.scrollTo(0, 0); }
+  let modeNav = [];
+  let testDraft = null;
+  function setTab(t) {
+    if (t === tab && t === "study" && nav.length) { nav = []; navDir = "back"; }
+    else if (t === tab && t === "home" && modeNav.length) { modeNav = []; navDir = "back"; }
+    else navDir = "tab";
+    tab = t;
+    if (t !== "study") nav = [];
+    if (t !== "home") modeNav = [];
+    render(); window.scrollTo(0, 0);
+  }
   function applyDisplay() {
     const de = document.documentElement, st = state.settings;
     de.classList.toggle("fs-s", st.fs === "s"); de.classList.toggle("fs-l", st.fs === "l"); de.classList.toggle("fs-xl", st.fs === "xl");
@@ -265,18 +275,25 @@
     $$(".tab").forEach((b) => b.setAttribute("aria-current", b.dataset.tab === tab ? "page" : "false"));
     $("#top-stars").innerHTML = topStars();
     const back = $("#back-btn");
-    back.hidden = !(tab === "study" && nav.length);
+    back.hidden = !((tab === "study" && nav.length) || (tab === "home" && modeNav.length));
     const m = $("#main");
     let title = "ほしの学園";
     m.classList.remove("page-in", "pg-fwd", "pg-back", "pg-tab"); void m.offsetWidth; m.classList.add("page-in", "pg-" + navDir); navDir = "fwd";
-    if (tab === "home") m.innerHTML = viewHome();
+    if (tab === "home") {
+      if (modeNav.length) { const r = viewMode(); m.innerHTML = r.html; title = r.title; }
+      else m.innerHTML = viewHome();
+    }
     else if (tab === "study") { const r = viewStudy(); m.innerHTML = r.html; title = r.title; }
     else if (tab === "games") { m.innerHTML = viewGames(); title = "ゲーム"; }
     else if (tab === "gacha") { m.innerHTML = window.HMGK ? HMGK.view() : viewGacha(); title = "相棒"; }
     else if (tab === "settings") { m.innerHTML = viewSettings(); title = "マイページ"; }
     $("#top-title").textContent = title;
     $("#topbar").classList.toggle("large", !(tab === "study" && nav.length));
-    const bl = $("#back-btn"); if (bl && !bl.hidden) { const pv = nav[nav.length - 2]; bl.innerHTML = '<span class="chev">‹</span>' + esc(!pv ? "学ぶ" : pv.v === "grades" ? subjById(pv.s).n : pv.v === "units" ? subjName(pv.s, pv.g) + gradeName(pv.g) : "もどる"); }
+    const bl = $("#back-btn");
+    if (bl && !bl.hidden) {
+      if (tab === "home") bl.innerHTML = '<span class="chev">‹</span>ホーム';
+      else { const pv = nav[nav.length - 2]; bl.innerHTML = '<span class="chev">‹</span>' + esc(!pv ? "学ぶ" : pv.v === "grades" ? subjById(pv.s).n : pv.v === "units" ? subjName(pv.s, pv.g) + gradeName(pv.g) : "もどる"); }
+    }
     mountPartner();
     bgmUpdate();
     if (window.HMGK) HMGK.afterRender(tab);
@@ -294,7 +311,8 @@
   function viewHome() {
     const p = GCArt.charById(state.partner), n = starsToday(), e = state.chars[p.id] || {}, need = Math.max(0, STARS_TO_UNLOCK - n);
     const line = HOME_LINES[(new Date().getDate() + n) % HOME_LINES.length];
-    let h = window.HMGK ? HMGK.homeHero() : '';
+    let h = homeModesHtml();
+    h += window.HMGK ? HMGK.homeHero() : '';
     h += '<section class="today2"><div class="t2-ring">' + ringSvg(n, STARS_TO_UNLOCK) + '<div class="t2-num"><b>' + n + '</b><small>/' + STARS_TO_UNLOCK + '</small></div></div><div class="t2-r"><div class="t2-k">今日の⭐</div>' +
       (need ? '<div class="t2-big">ゲームまで あと <b>' + need + "</b> 個</div>" : '<div class="t2-big ok">🎮 ゲーム解放中！</div>') +
       '<div class="t2-stars">' + Array.from({ length: STARS_TO_UNLOCK }, (_, i) => '<span class="t2s ' + (i < n ? "on" : "") + '" style="--i:' + i + '">★</span>').join("") + (n > STARS_TO_UNLOCK ? '<span class="t2-more">+' + (n - STARS_TO_UNLOCK) + "</span>" : "") + "</div></div></section>";
@@ -335,6 +353,324 @@
     return { done, total: u.steps.length };
   }
 
+  // ---------- v1.3.0 単元マーク・復習・予習・テスト対策 ----------
+  const MARK_OK = 90, MARK_MID = 60;
+  const PREP_SUBJ = ["math", "ja", "life", "sci", "soc", "en"];
+  function markOf(pct) { if (pct == null) return ""; return pct >= MARK_OK ? "ok" : pct >= MARK_MID ? "mid" : "ng"; }
+  function markIcon(m) { return m === "ok" ? "✅" : m === "mid" ? "△" : m === "ng" ? "❌" : ""; }
+  function markLabel(m, pct) { return m ? '<span class="umark ' + m + '">' + markIcon(m) + " " + pct + "%</span>" : '<span class="umark none">まだ</span>'; }
+  function markLegend() { return '<div class="mark-leg"><span class="ml">単元の判定</span><b>✅ 90%以上</b><b>△ 60〜89%</b><b>❌ 59%以下</b></div>'; }
+  function unitRecord(s, g, ui) {
+    const u = ((S()[s] || {})[g] || [])[ui]; if (!u) return null;
+    let best = 0, n = 0, plays = 0, passed = 0;
+    u.steps.forEach((st, si) => {
+      const p = state.progress[stepKey(s, g, ui, si)];
+      if (p && (p.plays || p.passed || p.n)) {
+        const nn = p.n || stepQCount(st) || 10;
+        best += (p.best || 0); n += nn; plays++;
+      }
+      if (p && p.passed) passed++;
+    });
+    const pct = n ? Math.round(100 * best / n) : null;
+    const mark = markOf(pct);
+    return { s, g, ui, un: u.n, total: u.steps.length, passed, plays, best, n, pct, mark, done: u.steps.length > 0 && passed >= u.steps.length };
+  }
+  function allUnitRecords() {
+    const list = [];
+    for (const s of SUBJ) {
+      for (const g of gradesOf(s.id)) {
+        const us = (S()[s.id] || {})[g] || [];
+        for (let ui = 0; ui < us.length; ui++) { const r = unitRecord(s.id, g, ui); if (r) list.push(r); }
+      }
+    }
+    return list;
+  }
+  function weakUnits() {
+    return allUnitRecords().filter((r) => r.mark === "ng" || r.mark === "mid").sort((a, b) => (a.mark === "ng" && b.mark !== "ng" ? -1 : a.mark !== "ng" && b.mark === "ng" ? 1 : (a.pct || 0) - (b.pct || 0)));
+  }
+  function prepGrade() { return state.settings.grade || 0; }
+  function nextPrepUnit(grade) {
+    if (!grade) return null;
+    for (const s of PREP_SUBJ) {
+      const us = (S()[s] || {})[grade] || [];
+      for (let ui = 0; ui < us.length; ui++) { const r = unitRecord(s, grade, ui); if (r && !r.done) return r; }
+    }
+    return null;
+  }
+  function upcomingPrep(grade, from, n) {
+    if (!grade) return [];
+    const out = []; let seen = !from;
+    for (const s of PREP_SUBJ) {
+      const us = (S()[s] || {})[grade] || [];
+      for (let ui = 0; ui < us.length; ui++) {
+        const r = unitRecord(s, grade, ui); if (!r) continue;
+        if (!seen) { if (r.s === from.s && r.g === from.g && r.ui === from.ui) seen = true; continue; }
+        out.push(r); if (out.length >= n) return out;
+      }
+    }
+    return out;
+  }
+  function testsArr() { if (!Array.isArray(state.tests)) state.tests = []; return state.tests; }
+  function addDays(ymd, n) { const [Y, M, D] = ymd.split("-").map(Number); const dt = new Date(Y, M - 1, D + n); return dt.getFullYear() + "-" + pad(dt.getMonth() + 1) + "-" + pad(dt.getDate()); }
+  function daysUntil(ymd) { const a = today().split("-").map(Number), b = String(ymd).split("-").map(Number); return Math.round((new Date(b[0], b[1] - 1, b[2]) - new Date(a[0], a[1] - 1, a[2])) / 86400000); }
+  function dateLabel(ymd) { const [Y, M, D] = String(ymd).split("-").map(Number); const dt = new Date(Y, M - 1, D); return M + "月" + D + "日（" + "日月火水木金土"[dt.getDay()] + "）"; }
+  function resolveScope(sc) {
+    const us = (S()[sc.s] || {})[sc.g] || [];
+    if (sc.un) { const i = us.findIndex((u) => u.n === sc.un); if (i >= 0) return { s: sc.s, g: sc.g, ui: i, un: sc.un }; }
+    if (us[sc.ui]) return { s: sc.s, g: sc.g, ui: sc.ui, un: us[sc.ui].n };
+    return null;
+  }
+  function testScopeRecs(test) { return (test.scope || []).map(resolveScope).filter(Boolean).map((sc) => unitRecord(sc.s, sc.g, sc.ui)).filter(Boolean); }
+  function upcomingTests() { return testsArr().filter((t) => daysUntil(t.date) >= 0).sort((a, b) => String(a.date).localeCompare(String(b.date)) || (a.t || 0) - (b.t || 0)); }
+  function pastTests() { return testsArr().filter((t) => daysUntil(t.date) < 0).sort((a, b) => String(b.date).localeCompare(String(a.date))); }
+  function nearestTest() { return upcomingTests()[0] || null; }
+  function testPlan(test) {
+    const recs = testScopeRecs(test);
+    const rank = { ng: 0, mid: 1, "": 2, ok: 3 };
+    const ordered = recs.slice().sort((a, b) => (rank[a.mark] - rank[b.mark]) || (a.pct == null ? -1 : a.pct) - (b.pct == null ? -1 : b.pct));
+    const left = daysUntil(test.date);
+    const D = left > 0 ? left : 1;
+    if (!ordered.length) return { left, items: [], today: null };
+    const perDay = Math.max(1, Math.ceil(ordered.length / D));
+    const queue = ordered.slice();
+    const weak = ordered.filter((r) => r.mark !== "ok");
+    const extra = weak.length ? weak : ordered;
+    let guard = 0;
+    while (queue.length < D * perDay && extra.length && guard++ < 80) queue.push.apply(queue, extra);
+    const items = [];
+    for (let i = 0; i < D; i++) {
+      const dk = addDays(today(), i);
+      if (left > 0 && dk === test.date) break;
+      const units = [], seen = {};
+      for (let k = 0; k < perDay; k++) {
+        const u = queue[i * perDay + k] || ordered[k % ordered.length];
+        const id = u.s + "|" + u.g + "|" + u.ui;
+        if (seen[id]) continue; seen[id] = 1; units.push(u);
+      }
+      if (!units.length) units.push(ordered[i % ordered.length]);
+      items.push({ date: dk, units });
+    }
+    return { left, items, today: items.find((p) => p.date === today()) || items[0] || null };
+  }
+  function countDownText(test) {
+    const d = daysUntil(test.date);
+    if (d === 0) return { k: "今日がテスト", big: "今日", sub: dateLabel(test.date) };
+    return { k: "テストまで", big: "あと <b>" + d + "</b> 日", sub: dateLabel(test.date) };
+  }
+  function testNameOf(t) { return (t.name && String(t.name).trim()) || "テスト"; }
+  function defaultTestName(scope) {
+    const recs = (scope || []).map(resolveScope).filter(Boolean);
+    if (!recs.length) return "テスト";
+    const s0 = recs[0].s;
+    if (recs.every((r) => r.s === s0)) return subjName(s0, recs[0].g) + "のテスト";
+    return "テスト";
+  }
+  function firstOpenStep(s, g, ui) {
+    const u = ((S()[s] || {})[g] || [])[ui]; if (!u) return 0;
+    for (let si = 0; si < u.steps.length; si++) { const p = state.progress[stepKey(s, g, ui, si)]; if (!p || !p.passed) return si; }
+    return 0;
+  }
+  function goUnit(s, g, ui, start) {
+    if (start) { startStep(s, g, ui, firstOpenStep(s, g, ui)); return; }
+    tab = "study"; modeNav = [];
+    nav = [{ v: "grades", s }, { v: "units", s, g }, { v: "steps", s, g, u: ui }];
+    navDir = "fwd"; render(); window.scrollTo(0, 0);
+  }
+  function unitRow(r, act, extra) {
+    const sb = subjById(r.s);
+    return '<button type="button" class="row-btn unit-row" data-act="' + act + '" data-s="' + r.s + '" data-g="' + r.g + '" data-ui="' + r.ui + '">' + HMIcons.icon(r.s, sb.c, 36) + '<span class="grow"><b>' + esc(r.un) + "</b><span class=\"small muted\">" + esc(subjName(r.s, r.g) + " " + gradeName(r.g)) + " ・ 合格 " + r.passed + "/" + r.total + "</span></span>" + markLabel(r.mark, r.pct) + (extra || "") + "</button>";
+  }
+
+  function homeModesHtml() {
+    const weak = weakUnits(), boxN = (state.wrongBox || []).length;
+    const g = prepGrade(), next = nextPrepUnit(g);
+    const nt = nearestTest();
+    let revSub = boxN || weak.length ? ((boxN ? "まちがえた問題 " + boxN + "問" : "") + (boxN && weak.length ? " ・ " : "") + (weak.length ? "△❌ " + weak.length + "単元" : "")) : "できるようになったところを、もう一度";
+    let prepSub = !g ? "学年をえらぶと、次の単元が出るよ" : next ? (subjName(next.s, next.g) + " ／ " + next.un) : "この学年の単元は全部やってあるよ";
+    let testSub = nt ? (testNameOf(nt) + " ・ " + (daysUntil(nt.date) === 0 ? "今日" : "あと" + daysUntil(nt.date) + "日")) : "テストの日と範囲を登録しよう";
+    let h = "";
+    if (nt) {
+      const cd = countDownText(nt), plan = testPlan(nt), todayU = plan.today ? plan.today.units : [];
+      h += '<button type="button" class="cdown" data-act="mode-test-one" data-id="' + esc(nt.id) + '"><div class="cd-k">' + esc(testNameOf(nt)) + " ・ " + cd.k + '</div><div class="cd-big">' + cd.big + '</div><div class="cd-sub">' + esc(cd.sub) + (todayU.length ? " ・ 今日は " + todayU.map((u) => u.un).join("、") : "") + "</div></button>";
+    }
+    h += '<div class="modes3">';
+    h += '<button type="button" class="mode-card review" data-act="mode-review"><span class="mc-ico">📘</span><b>復習</b><small>' + esc(revSub) + "</small></button>";
+    h += '<button type="button" class="mode-card prep" data-act="mode-prep"><span class="mc-ico">📗</span><b>予習</b><small>' + esc(prepSub) + "</small></button>";
+    h += '<button type="button" class="mode-card test" data-act="mode-test"><span class="mc-ico">📝</span><b>テスト対策</b><small>' + esc(testSub) + "</small></button>";
+    h += "</div>";
+    h += '<button type="button" class="marks-link" data-act="mode-marks">単元のようす ' + markLabel("ok", 90).replace("90%", "✅") + " " + "△ ❌ を見る</button>";
+    return h;
+  }
+  function viewMode() {
+    const top = modeNav[modeNav.length - 1] || {};
+    if (top.v === "review") return { title: "復習", html: viewReview() };
+    if (top.v === "prep") return { title: "予習", html: viewPrep() };
+    if (top.v === "test") return { title: "テスト対策", html: viewTests() };
+    if (top.v === "test-new" || top.v === "test-edit") return { title: top.v === "test-edit" ? "テストを編集" : "テストを登録", html: viewTestForm() };
+    if (top.v === "test-one") return { title: "テスト対策", html: viewTestOne(top.id) };
+    if (top.v === "marks") return { title: "単元のようす", html: viewMarks() };
+    return { title: "ほしの学園", html: "" };
+  }
+  function viewReview() {
+    const weak = weakUnits(), boxN = (state.wrongBox || []).length;
+    let h = markLegend();
+    if (boxN) h += '<button type="button" class="box-card" data-act="box"><span class="bx-i">📦</span><span class="grow"><b>まちがえた問題ボックス</b><small>' + boxN + " 問 ・ 正解すると消えるよ</small></span><span class=\"go\">▶</span></button>";
+    h += '<div class="sec2">△・❌の単元</div>';
+    if (weak.length) h += '<div class="list">' + weak.map((r) => unitRow(r, "go-unit-start")).join("") + "</div>";
+    else h += '<p class="lead soft">今はにがての単元はないよ。単元のようすから、もう一度やってみよう。</p>';
+    h += '<button type="button" class="marks-link" data-act="mode-marks">すべての単元のようすを見る</button>';
+    return h;
+  }
+  function viewPrep() {
+    const g = prepGrade();
+    let h = '<p class="lead">学年の教科書の順で、まだの次の単元から進むよ。</p>';
+    h += '<div class="prep-grades">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map((x) => '<button type="button" class="chip' + (x === g ? " on" : "") + '" data-act="prep-grade" data-g="' + x + '">' + gradeName(x) + "</button>").join("") + "</div>";
+    if (!g) { h += '<p class="lead soft">学年をえらぶと、次の単元が出るよ。</p>'; return h; }
+    const next = nextPrepUnit(g);
+    if (!next) {
+      h += '<div class="prep-hero done"><div class="ph-k">' + gradeName(g) + '</div><b>この学年の単元は全部やってあるよ！</b><p>復習やテスト対策もできるよ。</p><div class="actions two"><button type="button" class="btn" data-act="mode-review">復習</button><button type="button" class="btn primary" data-act="mode-test">テスト対策</button></div></div>';
+      return h;
+    }
+    const sb = subjById(next.s);
+    h += '<div class="prep-hero" style="--sc:' + sb.c + '">' + HMIcons.icon(next.s, sb.c, 56) + '<div class="ph-k">次の単元</div><b>' + esc(next.un) + "</b><small>" + esc(subjName(next.s, next.g) + " " + gradeName(next.g)) + " ・ 合格 " + next.passed + "/" + next.total + "</small>" + markLabel(next.mark, next.pct) + '<button type="button" class="btn primary block" data-act="go-unit-start" data-s="' + next.s + '" data-g="' + next.g + '" data-ui="' + next.ui + '">この単元をはじめる</button></div>';
+    const more = upcomingPrep(g, next, 6);
+    if (more.length) h += '<div class="sec2">このあとの単元</div><div class="list">' + more.map((r) => unitRow(r, "go-unit")).join("") + "</div>";
+    return h;
+  }
+  function viewTests() {
+    const up = upcomingTests(), past = pastTests();
+    let h = '<p class="lead">テストの日と範囲を登録すると、毎日の計画とカウントダウンができるよ。</p>';
+    h += '<button type="button" class="btn primary block" data-act="mode-test-new">＋ テストを登録</button>';
+    if (up.length) {
+      h += '<div class="sec2">これから</div><div class="list">';
+      up.forEach((t) => {
+        const cd = countDownText(t), plan = testPlan(t);
+        h += '<button type="button" class="test-card" data-act="mode-test-one" data-id="' + esc(t.id) + '"><div class="tc-top"><b>' + esc(testNameOf(t)) + "</b><span class=\"tc-cd\">" + (daysUntil(t.date) === 0 ? "今日" : "あと" + daysUntil(t.date) + "日") + "</span></div><small>" + esc(cd.sub) + " ・ 範囲 " + (t.scope || []).length + "単元" + (plan.today && plan.today.units.length ? " ・ 今日は " + plan.today.units.map((u) => u.un).join("、") : "") + "</small></button>";
+      });
+      h += "</div>";
+    }
+    if (past.length) {
+      h += '<div class="sec2">これまでのテスト</div><div class="list">';
+      past.forEach((t) => { h += '<button type="button" class="test-card past" data-act="mode-test-one" data-id="' + esc(t.id) + '"><div class="tc-top"><b>' + esc(testNameOf(t)) + "</b></div><small>" + esc(dateLabel(t.date)) + " ・ 範囲 " + (t.scope || []).length + "単元</small></button>"; });
+      h += "</div>";
+    }
+    return h;
+  }
+  function viewTestOne(id) {
+    const t = testsArr().find((x) => x.id === id); if (!t) return '<p class="lead">このテストは見つからないよ。</p>';
+    const cd = countDownText(t), plan = testPlan(t), recs = testScopeRecs(t), left = daysUntil(t.date);
+    let h = '<div class="cdown inpage"><div class="cd-k">' + esc(testNameOf(t)) + " ・ " + cd.k + '</div><div class="cd-big">' + cd.big + '</div><div class="cd-sub">' + esc(cd.sub) + "</div></div>";
+    if (left >= 0 && plan.items.length) {
+      h += '<div class="sec2">毎日の計画</div><div class="plan-list">';
+      plan.items.forEach((day) => {
+        const isT = day.date === today();
+        h += '<div class="plan-day' + (isT ? " today" : "") + '"><div class="pd-d">' + (isT ? "今日 " : "") + esc(dateLabel(day.date)) + '</div><div class="pd-u">';
+        day.units.forEach((u) => { h += '<button type="button" class="plan-u" data-act="go-unit-start" data-s="' + u.s + '" data-g="' + u.g + '" data-ui="' + u.ui + '">' + markIcon(u.mark) + " " + esc(u.un) + "</button>"; });
+        h += "</div></div>";
+      });
+      h += "</div>";
+    }
+    h += '<div class="sec2">範囲</div>' + markLegend() + '<div class="list">' + recs.map((r) => unitRow(r, "go-unit-start")).join("") + "</div>";
+    if (left >= 0 && recs.length) h += '<button type="button" class="btn primary block mock-go" data-act="mock-start" data-id="' + esc(t.id) + '">📝 範囲から模擬テスト（10問）</button>';
+    if (t.lastMock) h += '<p class="small muted center">前の模擬テスト　' + t.lastMock.ok + "/" + t.lastMock.n + "（" + t.lastMock.pct + "%）</p>";
+    h += '<div class="actions two tight"><button type="button" class="btn" data-act="mode-test-edit" data-id="' + esc(t.id) + '">編集</button><button type="button" class="btn ghost" data-act="test-del" data-id="' + esc(t.id) + '">削除</button></div>';
+    return h;
+  }
+  function viewTestForm() {
+    if (!testDraft) testDraft = newDraft();
+    const d = testDraft;
+    const us = ((S()[d.pickS] || {})[d.pickG] || []);
+    let h = '<label class="field"><span>テストの名前</span><input class="input" id="tm-name" maxlength="24" value="' + esc(d.name) + '" placeholder="' + esc(defaultTestName(d.scope)) + '"></label>';
+    h += '<label class="field"><span>テストの日</span><input class="input" id="tm-date" type="date" value="' + esc(d.date) + '" min="' + today() + '"></label>';
+    h += '<div class="sec2">範囲の教科</div><div class="chips wrap">' + SUBJ.map((s) => '<button type="button" class="chip' + (s.id === d.pickS ? " on" : "") + '" data-act="td-s" data-s="' + s.id + '">' + esc(s.n) + "</button>").join("") + "</div>";
+    h += '<div class="sec2">学年</div><div class="chips wrap">' + gradesOf(d.pickS).map((g) => '<button type="button" class="chip' + (g === d.pickG ? " on" : "") + '" data-act="td-g" data-g="' + g + '">' + gradeName(g) + "</button>").join("") + "</div>";
+    h += '<div class="sec2">単元（タップで追加）</div>';
+    if (!us.length) h += '<p class="lead soft">この教科・学年の単元はないよ。べつの学年をえらんでね。</p>';
+    else h += '<div class="list">' + us.map((u, ui) => { const on = d.scope.some((x) => x.s === d.pickS && x.g === d.pickG && (x.ui === ui || x.un === u.n)); const r = unitRecord(d.pickS, d.pickG, ui); return '<button type="button" class="row-btn' + (on ? " picked" : "") + '" data-act="td-tog" data-s="' + d.pickS + '" data-g="' + d.pickG + '" data-ui="' + ui + '"><span class="un">' + (on ? "✓" : (ui + 1)) + '</span><span class="grow"><b>' + esc(u.n) + "</b></span>" + (r ? markLabel(r.mark, r.pct) : "") + "</button>"; }).join("") + "</div>";
+    if (d.scope.length) {
+      h += '<div class="sec2">えらんだ範囲（' + d.scope.length + '単元）</div><div class="picked-wrap">';
+      d.scope.forEach((sc, i) => { const r = resolveScope(sc); h += '<button type="button" class="picked-chip" data-act="td-rm" data-i="' + i + '">' + esc(r ? subjName(r.s, r.g) + " " + r.un : "？") + " ×</button>"; });
+      h += "</div>";
+    }
+    h += '<div class="actions"><button type="button" class="btn primary block" data-act="td-save">' + (d.id ? "保存する" : "登録する") + "</button></div>";
+    return h;
+  }
+  function newDraft() {
+    const g = prepGrade() || 7;
+    const pickS = (S().math && S().math[g]) ? "math" : "ja";
+    return { id: null, name: "", date: addDays(today(), 7), scope: [], pickS, pickG: (S()[pickS] || {})[g] ? g : (gradesOf(pickS)[0] || 7) };
+  }
+  function draftFromTest(t) {
+    const sc0 = (t.scope && t.scope[0]) || {};
+    const g = sc0.g || prepGrade() || 7;
+    return { id: t.id, name: t.name || "", date: t.date, scope: (t.scope || []).map((x) => Object.assign({}, x)), pickS: sc0.s || "math", pickG: g, t: t.t };
+  }
+  function readDraftInputs() { if (!testDraft) return; const n = $("#tm-name"), d = $("#tm-date"); if (n) testDraft.name = n.value; if (d && d.value) testDraft.date = d.value; }
+  function saveDraftTest() {
+    readDraftInputs();
+    const d = testDraft; if (!d) return;
+    if (!d.date) { toast("テストの日を入れてね"); return; }
+    if (daysUntil(d.date) < 0) { toast("テストの日は今日から先にしてね"); return; }
+    if (!d.scope.length) { toast("範囲の単元を1つ以上えらんでね"); return; }
+    const rec = { id: d.id || ("t" + now()), name: String(d.name || "").trim() || defaultTestName(d.scope), date: d.date, scope: d.scope.map((sc) => { const r = resolveScope(sc); return r || sc; }), t: now() };
+    const all = testsArr();
+    const i = all.findIndex((x) => x.id === rec.id);
+    if (i >= 0) { rec.lastMock = all[i].lastMock; all[i] = rec; } else all.push(rec);
+    save(); testDraft = null;
+    modeNav = [{ v: "test" }, { v: "test-one", id: rec.id }];
+    toast("テストを登録したよ"); render();
+  }
+  function viewMarks() {
+    const top = modeNav[modeNav.length - 1] || {};
+    const g = top.g || prepGrade() || 0;
+    const s = top.s || "";
+    let h = markLegend();
+    h += '<div class="chips wrap">' + [0].map(() => '<button type="button" class="chip' + (!g ? " on" : "") + '" data-act="marks-g" data-g="0">ぜんぶ</button>').join("") + [1, 2, 3, 4, 5, 6, 7, 8, 9].map((x) => '<button type="button" class="chip' + (x === g ? " on" : "") + '" data-act="marks-g" data-g="' + x + '">' + gradeName(x) + "</button>").join("") + "</div>";
+    h += '<div class="chips wrap subj-chips">' + ['<button type="button" class="chip' + (!s ? " on" : "") + '" data-act="marks-s" data-s="">すべて</button>'].concat(SUBJ.map((x) => '<button type="button" class="chip' + (x.id === s ? " on" : "") + '" data-act="marks-s" data-s="' + x.id + '">' + esc(x.n) + "</button>")).join("") + "</div>";
+    const recs = allUnitRecords().filter((r) => (!g || r.g === g) && (!s || r.s === s));
+    const nOk = recs.filter((r) => r.mark === "ok").length, nMid = recs.filter((r) => r.mark === "mid").length, nNg = recs.filter((r) => r.mark === "ng").length, nYet = recs.filter((r) => !r.mark).length;
+    h += '<div class="mark-sum"><span>✅ ' + nOk + '</span><span>△ ' + nMid + '</span><span>❌ ' + nNg + '</span><span class="yet">まだ ' + nYet + "</span></div>";
+    if (!recs.length) h += '<p class="lead soft">この条件の単元はないよ。</p>';
+    else h += '<div class="list">' + recs.map((r) => unitRow(r, "go-unit")).join("") + "</div>";
+    return h;
+  }
+  function collectScopeQuestions(scope, want) {
+    const pool = [];
+    (scope || []).forEach((raw) => {
+      const sc = resolveScope(raw); if (!sc) return;
+      const u = ((S()[sc.s] || {})[sc.g] || [])[sc.ui]; if (!u) return;
+      u.steps.forEach((st, si) => {
+        try {
+          const qs = HM.makeSet(st);
+          (qs || []).forEach((q) => { pool.push(Object.assign({}, q, { __src: { s: sc.s, g: sc.g, un: u.n, sn: st.n, ui: sc.ui, si } })); });
+        } catch (e) {}
+      });
+    });
+    return HM.U.shuf(pool).slice(0, want);
+  }
+  function startMock(test) {
+    const qs = collectScopeQuestions(test.scope, 10);
+    if (!qs.length) { toast("この範囲では問題を作れなかったよ"); return; }
+    Q = { s: qs[0].__src.s, g: qs[0].__src.g, ui: null, si: null, key: "mock|" + test.id, unit: { n: testNameOf(test) }, step: { n: "模擬テスト" }, qs, i: 0, mode: "mock", testId: test.id, results: [], baseCorrect: 0, need: HM.passNeed(qs.length), n: qs.length, shownAt: 0, answered: false, passOpen: true, combo: 0, starGiven: true, card: true };
+    $("#quiz").hidden = false; document.body.classList.add("in-quiz");
+    const p = GCArt.charById(state.partner);
+    $("#quiz").innerHTML = '<div class="sum mock-intro"><div class="mock-badge">📝 模擬テスト</div><h2>' + esc(testNameOf(test)) + "</h2><p class=\"lead\">" + Q.n + " 問 ・ 登録した範囲から出すよ</p><div class=\"sum-char\">" + charHtml(p.id, 110, "bob r" + p.rarity) + '<div class="bubble">本番のつもりで、いってみよう！</div></div><div class="sum-act"><button type="button" class="btn primary block" data-q="card-go">はじめる</button><button type="button" class="btn ghost block" data-q="quit">もどる</button></div></div>';
+    $("#quiz").scrollTop = 0;
+  }
+  function mockSummary() {
+    const pct = Q.n ? Math.round(100 * Q.baseCorrect / Q.n) : 0;
+    const mark = markOf(pct);
+    const t = testsArr().find((x) => x.id === Q.testId);
+    if (t) { t.lastMock = { t: now(), ok: Q.baseCorrect, n: Q.n, pct }; t.t = now(); save(); }
+    const p = GCArt.charById(state.partner);
+    const line = mark === "ok" ? "すごい！ この調子なら本番も安心だね！" : mark === "mid" ? "いい感じ！ にがてなところを復習して、もう一度やってみよう！" : "ここから伸びるよ。計画の単元をもう一度やってみよう！";
+    let h = '<div class="sum"><div class="mock-hero"><div class="mock-badge">📝 模擬テスト</div><div class="mh-score"><span class="umark ' + (mark || "none") + ' big">' + markIcon(mark) + " " + pct + "%</span></div><div class=\"mh-n num\">" + Q.baseCorrect + " / " + Q.n + " 問正解</div></div>";
+    h += '<div class="sum-char">' + charHtml(p.id, 110, "bob r" + p.rarity) + '<div class="bubble">' + esc(line) + "</div></div>";
+    h += '<div class="sum-act">' + (t ? '<button type="button" class="btn primary block" data-q="mock-again">もう一度チャレンジ</button>' : "") + '<button type="button" class="btn ghost block" data-q="quit">もどる</button></div></div>';
+    $("#quiz").innerHTML = h; $("#quiz").scrollTop = 0;
+    if (Q.baseCorrect) { confetti(mark === "ok" ? 60 : 24); sound(mark === "ok" ? "fanfare" : "soft"); }
+  }
+
   // 勉強タブ
   function viewStudy() {
     const top = nav[nav.length - 1];
@@ -347,7 +683,7 @@
     }
     if (top.v === "units") {
       const us = S()[top.s][top.g];
-      return { title: subjName(top.s, top.g) + " " + gradeName(top.g), html: '<p class="lead">単元をえらぼう</p><div class="list">' + us.map((u, ui) => { const r = unitStats(top.s, top.g, ui); return '<button type="button" class="row-btn" data-unit="' + ui + '"><span class="un">' + (ui + 1) + '</span><span class="grow"><b>' + esc(u.n) + '</b><span class="small muted">' + r.total + "ステップ ・ 合格 " + r.done + "</span>" + bar(r.done, r.total) + "</span>›</button>"; }).join("") + "</div>" };
+      return { title: subjName(top.s, top.g) + " " + gradeName(top.g), html: '<p class="lead">単元をえらぼう</p>' + markLegend() + '<div class="list">' + us.map((u, ui) => { const r = unitStats(top.s, top.g, ui); const mk = unitRecord(top.s, top.g, ui); return '<button type="button" class="row-btn unit-row" data-unit="' + ui + '"><span class="un">' + (ui + 1) + '</span><span class="grow"><b>' + esc(u.n) + '</b><span class="small muted">' + r.total + "ステップ ・ 合格 " + r.done + "</span>" + bar(r.done, r.total) + "</span>" + markLabel(mk.mark, mk.pct) + "</button>"; }).join("") + "</div>" };
     }
     if (top.v === "steps") {
       const u = S()[top.s][top.g][top.u], tk = dayRec(today()).steps, sb = subjById(top.s);
@@ -395,7 +731,7 @@
     h += '<div class="qz-body">';
     if (Q.mode === "boss") h += bossHtml();
     const src = q.__src || { s: Q.s, g: Q.g, sn: Q.step.n };
-    h += '<div class="qz-meta">' + esc(subjName(src.s, src.g) + " " + gradeName(src.g) + " ／ " + SN(src.sn)) + (Q.mode === "retry" ? ' <span class="retry-tag">やり直し</span>' : Q.mode === "box" ? ' <span class="retry-tag box">📦 ボックス</span>' : Q.mode === "boss" ? ' <span class="retry-tag boss">👾 ボス</span>' : "") + (q.skill && window.HMQ && HMQ.skillBadge ? " " + HMQ.skillBadge(q) : "") + "</div>";
+    h += '<div class="qz-meta">' + esc(subjName(src.s, src.g) + " " + gradeName(src.g) + " ／ " + SN(src.sn)) + (Q.mode === "retry" ? ' <span class="retry-tag">やり直し</span>' : Q.mode === "box" ? ' <span class="retry-tag box">📦 ボックス</span>' : Q.mode === "boss" ? ' <span class="retry-tag boss">👾 ボス</span>' : Q.mode === "mock" ? ' <span class="retry-tag mock">📝 模擬テスト</span>' : "") + (q.skill && window.HMQ && HMQ.skillBadge ? " " + HMQ.skillBadge(q) : "") + "</div>";
     if (q.pass) h += '<details class="passage"' + (Q.passOpen ? " open" : "") + '><summary>📄 文章を読む</summary><div class="ptext">' + esc(q.pass).replace(/\n/g, "<br>") + "</div></details>";
     const say = sayText(q);
     if (q.listen) h += '<div class="qz-q">' + q.q + "</div>" + (canSpeak() ? '<button type="button" class="say-big" data-q="say"><span>🔊</span><b>タップして聞こう</b><small>何回でも聞けるよ</small></button>' : '<div class="say-text">' + esc(say) + "</div>");
@@ -587,7 +923,7 @@
     else if (Q.mode === "retry") { Q.retryRes.push({ q, ok, given: gtext }); if (ok) Q.retryCorrect++; }
     afterAnswer(q, ok);
     if (typeof onAnswered === "function") onAnswered(q, ok);
-    if (ok && Q.mode === "main") Q.baseCorrect++;
+    if (ok && (Q.mode === "main" || Q.mode === "mock")) Q.baseCorrect++;
     // 画面
     if (q.t === "ch") $$(".opt").forEach((b) => { const v = (q.opts || [q.a].concat(q.o))[+b.dataset.opt]; b.disabled = true; if (v === q.a) b.classList.add("right"); else if (v === given) b.classList.add("wrong"); });
     else if (q.t === "num") { const box = $("#ans-box"); box.classList.add(ok ? "right" : "wrong"); $$(".key").forEach((k) => (k.disabled = true)); }
@@ -638,6 +974,7 @@
   function finishRound() {
     if (Q.mode === "box") return boxSummary();
     if (Q.mode === "boss") return bossSummary();
+    if (Q.mode === "mock") return mockSummary();
     if (Q.mode === "main") {
       const p = state.progress[Q.key] || { best: 0, n: Q.n, plays: 0, passed: false };
       Q.prevBest = p.plays ? p.best : null;
@@ -1224,7 +1561,14 @@
     const t = e.target;
     const tb = t.closest(".tab"); if (tb) { setTab(tb.dataset.tab); return; }
     if (t.closest("button")) haptic(6);
-    if (t.closest("#back-btn")) { nav.pop(); navDir = "back"; render(); window.scrollTo(0, 0); return; }
+    if (t.closest("#back-btn")) {
+      if (tab === "home" && modeNav.length) {
+        const top = modeNav[modeNav.length - 1];
+        if (top && (top.v === "test-new" || top.v === "test-edit")) readDraftInputs();
+        modeNav.pop(); navDir = "back"; render(); window.scrollTo(0, 0); return;
+      }
+      nav.pop(); navDir = "back"; render(); window.scrollTo(0, 0); return;
+    }
     if (t.closest("#gl-close")) { closeLayer(); return; }
     // クイズ
     if (t.closest("#quiz")) {
@@ -1245,6 +1589,7 @@
       const act = a.dataset.q;
       if (act === "say") { const q = curList()[Q.i]; speak(sayText(q)); a.classList.remove("on"); void a.offsetWidth; a.classList.add("on"); return; }
       if (act === "box-again") { startBox(); return; }
+      if (act === "mock-again") { const t2 = testsArr().find((x) => x.id === Q.testId); if (t2) startMock(t2); return; }
       if (act === "hint") { showHint(); return; }
       if (act === "boss-again") { const b = [Q.s, Q.g, Q.ui]; startBoss(...b); return; }
       if (act === "submit") { if (!Q.answered && workDone()) answer(workResult()); }
@@ -1295,6 +1640,31 @@
       else if (a === "backup") download("hoshigakuen-backup-" + today() + ".json", JSON.stringify(state));
       else if (a === "restore") $("#restore-file").click();
       else if (a === "reset") { if (confirm("すべてのデータ（⭐・なかま・記録）を消します。よろしいですか？") && confirm("本当に消しますか？もとに戻せません。")) { state = fresh(); save(); render(); toast("データを消しました"); } }
+      else if (a === "mode-review") { modeNav = [{ v: "review" }]; navDir = "fwd"; render(); window.scrollTo(0, 0); }
+      else if (a === "mode-prep") { modeNav = [{ v: "prep" }]; navDir = "fwd"; render(); window.scrollTo(0, 0); }
+      else if (a === "mode-test") { modeNav = [{ v: "test" }]; navDir = "fwd"; render(); window.scrollTo(0, 0); }
+      else if (a === "mode-marks") { modeNav = modeNav.length ? modeNav.concat([{ v: "marks", s: "", g: prepGrade() }]) : [{ v: "marks", s: "", g: prepGrade() }]; navDir = "fwd"; render(); window.scrollTo(0, 0); }
+      else if (a === "mode-test-new") { testDraft = newDraft(); modeNav = [{ v: "test" }, { v: "test-new" }]; navDir = "fwd"; render(); window.scrollTo(0, 0); }
+      else if (a === "mode-test-edit") { const t2 = testsArr().find((x) => x.id === ac.dataset.id); if (!t2) return; testDraft = draftFromTest(t2); modeNav = [{ v: "test" }, { v: "test-one", id: t2.id }, { v: "test-edit" }]; navDir = "fwd"; render(); window.scrollTo(0, 0); }
+      else if (a === "mode-test-one") { modeNav = [{ v: "test" }, { v: "test-one", id: ac.dataset.id }]; navDir = "fwd"; render(); window.scrollTo(0, 0); }
+      else if (a === "prep-grade") { state.settings.grade = +ac.dataset.g; save(); toast("🎒 " + gradeName(state.settings.grade) + "にしました"); render(); }
+      else if (a === "marks-g") { const cur = modeNav[modeNav.length - 1]; if (cur && cur.v === "marks") { cur.g = +ac.dataset.g; render(); } }
+      else if (a === "marks-s") { const cur = modeNav[modeNav.length - 1]; if (cur && cur.v === "marks") { cur.s = ac.dataset.s || ""; render(); } }
+      else if (a === "go-unit" || a === "go-unit-start") { goUnit(ac.dataset.s, +ac.dataset.g, +ac.dataset.ui, a === "go-unit-start"); }
+      else if (a === "td-s") { readDraftInputs(); testDraft.pickS = ac.dataset.s; const gs = gradesOf(testDraft.pickS); if (!gs.includes(testDraft.pickG)) testDraft.pickG = gs[0] || testDraft.pickG; render(); }
+      else if (a === "td-g") { readDraftInputs(); testDraft.pickG = +ac.dataset.g; render(); }
+      else if (a === "td-tog") {
+        readDraftInputs();
+        const s = ac.dataset.s, g = +ac.dataset.g, ui = +ac.dataset.ui;
+        const u = ((S()[s] || {})[g] || [])[ui]; if (!u) return;
+        const i = testDraft.scope.findIndex((x) => x.s === s && x.g === g && (x.ui === ui || x.un === u.n));
+        if (i >= 0) testDraft.scope.splice(i, 1); else testDraft.scope.push({ s, g, ui, un: u.n });
+        render();
+      }
+      else if (a === "td-rm") { readDraftInputs(); testDraft.scope.splice(+ac.dataset.i, 1); render(); }
+      else if (a === "td-save") saveDraftTest();
+      else if (a === "test-del") { if (confirm("このテストを削除しますか？")) { state.tests = testsArr().filter((x) => x.id !== ac.dataset.id); save(); modeNav = [{ v: "test" }]; render(); toast("削除したよ"); } }
+      else if (a === "mock-start") { const t2 = testsArr().find((x) => x.id === ac.dataset.id); if (t2) startMock(t2); }
     }
   });
   document.addEventListener("change", (e) => {
@@ -1303,6 +1673,7 @@
     if (e.target.id === "bgmvol") { state.settings.bgmVol = +e.target.value; save(); bgmUpdate(); return; }
     if (e.target.id === "remind-at") { state.settings.remindAt = e.target.value || "17:00"; state.settings.remindDone = null; save(); return; }
     if (e.target.id === "nick") { state.settings.nick = e.target.value.trim().slice(0, 12); save(); return; }
+    if (e.target.id === "tm-name" || e.target.id === "tm-date") { readDraftInputs(); return; }
     if (e.target.id === "restore-file") {
       const f = e.target.files[0]; if (!f) return;
       f.text().then((txt) => { const d = JSON.parse(txt); if (!d || typeof d !== "object" || !d.chars) throw new Error("bad"); state = migrate(d); save(); render(); toast("バックアップから戻しました"); }).catch(() => toast("読みこめませんでした"));
