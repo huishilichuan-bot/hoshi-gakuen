@@ -1528,3 +1528,29 @@ html.rmotion .mode-sel, html.rmotion .ms-slot { animation: none; }
 .ms-courses { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
 .ms-course { border: 0; border-radius: 999px; padding: 7px 11px; background: #edf2ff; color: #364fc7; font: inherit; font-size: 12.5px; font-weight: 800; }
 .ms-course.on { background: #5f3dc4; color: #fff; }
+
+/* 3Dレース（カート） */
+.gl-body.r3d-body { overflow: hidden; position: relative; touch-action: none; }
+.r3d-wait { display: flex; align-items: center; justify-content: center; height: 100%; min-height: 240px; font-weight: 800; color: #fff; letter-spacing: .04em; }
+.r3d { position: relative; flex: 1; min-height: 0; width: 100%; height: 100%; overflow: hidden; touch-action: none; }
+.game-layer .r3d canvas.r3d-gl,
+.game-layer .r3d canvas.r3d-fx { position: absolute; inset: 0; width: 100%; height: 100%; display: block; border-radius: 0 !important; }
+.r3d-fx { pointer-events: none; z-index: 2; }
+.game-layer .r3d canvas.r3d-map { position: absolute; top: 8px; right: 8px; width: 88px; height: 88px; border-radius: 50% !important; z-index: 3; pointer-events: none; box-shadow: 0 0 0 3px rgba(255,255,255,.28), 0 6px 16px rgba(0,0,0,.28); }
+.r3d-hud { position: absolute; top: 8px; left: 10px; z-index: 3; color: #fff; font-weight: 900; text-shadow: 0 2px 8px rgba(0,0,0,.5); pointer-events: none; }
+.r3d-pos { font-size: 32px; line-height: 1; }
+.r3d-lap, .r3d-time { font-size: 13px; margin-top: 2px; letter-spacing: .04em; }
+.r3d-item { margin-top: 8px; background: rgba(16,14,40,.72); border-radius: 12px; padding: 6px 10px; font-size: 12px; width: max-content; letter-spacing: .02em; }
+.r3d-mt { width: 84px; height: 6px; background: rgba(255,255,255,.22); border-radius: 99px; margin-top: 6px; overflow: hidden; }
+.r3d-mt i { display: block; height: 100%; width: 0; background: rgba(255,255,255,.55); }
+.r3d-cheer { position: absolute; top: 86px; left: 12px; right: 12px; text-align: center; z-index: 3; font-weight: 800; font-size: 14px; color: #ffe066; text-shadow: 0 2px 8px rgba(0,0,0,.55); pointer-events: none; }
+.r3d-cd { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 76px; font-weight: 900; color: #fff; text-shadow: 0 4px 18px rgba(0,0,0,.45); z-index: 4; pointer-events: none; }
+.r3d-pad { position: absolute; left: 0; right: 0; bottom: 6px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 12px calc(8px + var(--sab, 0px)); z-index: 5; }
+.r3d-steer { width: 110px; height: 110px; border-radius: 50%; background: rgba(255,255,255,.14); border: 2px solid rgba(255,255,255,.32); position: relative; touch-action: none; }
+.r3d-steer.on { background: rgba(255,255,255,.22); }
+.r3d-knob { position: absolute; left: 50%; top: 50%; width: 42px; height: 42px; margin: -21px 0 0 -21px; border-radius: 50%; background: rgba(255,255,255,.9); box-shadow: 0 4px 10px rgba(0,0,0,.28); will-change: transform; }
+.r3d-btns { display: flex; flex-direction: column; gap: 10px; }
+.r3d-btn { min-width: 100px; min-height: 52px; border: 0; border-radius: 16px; font: inherit; font-weight: 900; font-size: 14px; color: #1c1a14; touch-action: manipulation; }
+.r3d-btn.drift { background: linear-gradient(135deg, #ffe066, #ff922b); }
+.r3d-btn.item { background: linear-gradient(135deg, #74c0fc, #4dabf7); color: #102a43; }
+.r3d-btn.on { filter: brightness(1.12); transform: scale(.96); }
