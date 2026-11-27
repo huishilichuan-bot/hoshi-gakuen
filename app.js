@@ -784,9 +784,11 @@
   function examTotBox(title, pack, full) {
     let h = '<div class="ex-tot"><div class="k">' + title + '</div>';
     if (!pack.n) h += '<div class="n">—</div><div class="yet">まだ</div>';
-    else {
+    else if (pack.n < pack.need) {
+      h += '<div class="n">' + pack.score + " <small>点</small></div>";
+      h += '<div class="yet">' + pack.n + " / " + pack.need + " 教科</div>";
+    } else {
       h += '<div class="n">' + pack.score + " <small>/ " + pack.max + " 点</small></div>";
-      if (pack.n < pack.need) h += '<div class="yet">' + pack.n + " / " + pack.need + " 教科</div>";
     }
     return h + "</div>";
   }
@@ -934,7 +936,7 @@
         if (graded) h += '<span class="ex-mark">' + (res.ok ? "◯" : "×") + "</span>";
         h += '<div class="eq-q">' + examQHtml(q) + "</div>";
         if (q.t === "ch" || q.t === "tf" || q.t === "mc" || ((q.opts || q.o) && q.t !== "ty")) {
-          const opts = q.opts || (q.t === "tf" ? ["○", "×"] : [q.a].concat(q.o || []));
+          const opts = q.opts || (q.t === "tf" ? ["〇", "×"] : [q.a].concat(q.o || []));
           const seen = {};
           opts.forEach((o) => {
             if (o == null || seen[o]) return; seen[o] = 1;

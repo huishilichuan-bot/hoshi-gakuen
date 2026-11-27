@@ -175,7 +175,24 @@
       });
       return { score: score, max: max, n: n, need: ids.length, latest: latest, done: done };
     }
-    return { five: sum(MAIN), nine: sum(ALL9), latest: latest };
+    // 9教科：主要5＋音楽・美術・保健体育＋技術家庭（技術と家庭はまとめて1教科、100点）
+    function nine() {
+      const pack = sum(MAIN.concat(["music", "art", "pe"]));
+      const t = latest.tech, ho = latest.home;
+      if (t || ho) {
+        pack.n += 1;
+        if (t && ho) {
+          pack.score += Math.round((t.score + ho.score) / 2);
+          pack.max += Math.round((t.max + ho.max) / 2);
+        } else {
+          const h = t || ho;
+          pack.score += h.score; pack.max += h.max;
+        }
+      }
+      pack.need = 9;
+      return pack;
+    }
+    return { five: sum(MAIN), nine: nine(), latest: latest };
   }
 
   root.HMExam = {
