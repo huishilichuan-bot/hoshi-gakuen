@@ -121,10 +121,9 @@
 
   function nearestT(curve, x, z, hint, segs) {
     let best = hint, bestD = 1e9;
-    const p = { x: 0, y: 0, z: 0 };
     for (let k = -12; k <= 12; k++) {
       const t = (((hint + k / segs) % 1) + 1) % 1;
-      curve.getPointAt(t, p);
+      const p = curve.getPointAt(t);
       const dx = p.x - x, dz = p.z - z, d = dx * dx + dz * dz;
       if (d < bestD) { bestD = d; best = t; }
     }
@@ -316,7 +315,7 @@
     }
     const me = racers[0];
     const input = { steer: 0, drift: 0, item: 0 };
-    st.input = input;
+    st.input = input; st.me = me; st.racers = racers;
 
     // タッチ操作
     const steerEl = body.querySelector(".r3d-steer");
