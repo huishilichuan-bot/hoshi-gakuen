@@ -1,7 +1,7 @@
 /* ほしの学園 — 勉強して⭐を集める学習アプリ（小1〜中3）。課金・お金の機能はありません。 */
 (() => {
   "use strict";
-  const VERSION = "1.7.1";
+  const VERSION = "1.7.2";
   // 記録はプロフィールごとに分けて保存：ゲスト＝"hoshigakuen"、アカウント＝"hoshigakuen:u:<uid>"（ログアウトで消す）
   const GUEST_KEY = "hoshigakuen";
   let KEY = GUEST_KEY;
@@ -2353,8 +2353,8 @@
   function viewGacha() {
     const left = pullsLeft(), owned = Object.keys(state.chars).length;
     let h = '<section class="card gacha-top"><div class="capsule-machine">🎁</div><div class="grow"><b>なかまガチャ</b><div class="small muted">⭐をとるたびに1回。お金では引けません（課金なし）。</div><div class="pulls">のこり <b class="num">' + left + "</b> 回</div></div></section>";
-    h += '<div class="actions two"><button type="button" class="btn primary" data-g="1" ' + (left >= 1 ? "" : "disabled") + '>1回ひく</button><button type="button" class="btn gold" data-g="10" ' + (left >= 10 ? "" : "disabled") + ">10回ひく</button></div>";
-    h += '<p class="small muted center">10回ひくと、10回目はスーパーレア以上が確定。<button type="button" class="link-btn" data-g="rates">確率を見る</button></p>';
+    h += '<div class="actions two"><button type="button" class="btn primary" data-gacha="1" ' + (left >= 1 ? "" : "disabled") + '>1回ひく</button><button type="button" class="btn gold" data-gacha="10" ' + (left >= 10 ? "" : "disabled") + ">10回ひく</button></div>";
+    h += '<p class="small muted center">10回ひくと、10回目はスーパーレア以上が確定。<button type="button" class="link-btn" data-gacha="rates">確率を見る</button></p>';
     h += '<div class="sec">図鑑 <span class="muted">' + owned + "/" + GCArt.CHARACTERS.length + "</span></div>";
     h += '<div class="zukan">' + GCArt.CHARACTERS.map((c) => { const e = state.chars[c.id]; if (!e) return '<div class="zk none"><div class="sil">？</div><small>' + GCArt.RARITIES[c.rarity].s + "</small></div>"; return '<button type="button" class="zk r' + c.rarity + (c.rarity >= 5 ? " goldf" : "") + (state.partner === c.id ? " partner" : "") + '" data-char="' + c.id + '">' + charHtml(c.id, 64) + "<small>" + esc(c.name) + "</small>" + starMarks(e.star || 0) + (c.rarity >= 5 ? '<i class="spk s1"></i><i class="spk s2"></i><i class="spk s3"></i>' : "") + "</button>"; }).join("") + "</div>";
     h += '<div class="sec">見た目（なかまのレア度でふえる）</div>';
@@ -2559,7 +2559,8 @@
     const bb = t.closest("[data-boss]"); if (bb) { const top = nav[nav.length - 1]; startBoss(top.s, top.g, top.u); return; }
     const stb = t.closest("[data-step]"); if (stb) { const top = nav[nav.length - 1]; startStep(top.s, top.g, top.u, +stb.dataset.step); return; }
     const gm = t.closest("[data-game]"); if (gm) { openGameMenu(gm.dataset.game); return; }
-    const ga = t.closest("[data-g]"); if (ga) { if (ga.dataset.g === "rates") openRates(); else doGacha(+ga.dataset.g); return; }
+    // ガチャ回数は data-gacha（1 / 10 / rates）。data-g は学年用なので、ここでは見ない
+    const ga = t.closest("[data-gacha]"); if (ga) { if (ga.dataset.gacha === "rates") openRates(); else doGacha(+ga.dataset.gacha); return; }
     const ch = t.closest("[data-char]"); if (ch) { openChar(ch.dataset.char); return; }
     const bg = t.closest("button[data-bg]"); if (bg) { state.look.bg = bg.dataset.bg; save(); render(); return; }
     const mr = t.closest("button[data-maru]"); if (mr) { state.look.maru = mr.dataset.maru; save(); render(); bigMaru(); return; }
