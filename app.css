@@ -1560,3 +1560,16 @@ html.rmotion .mode-sel, html.rmotion .ms-slot { animation: none; }
 .r3d-btn.item { background: linear-gradient(135deg, #74c0fc, #4dabf7); color: #102a43; }
 .r3d-btn.on { filter: brightness(1.2); transform: scale(.96); box-shadow: 0 1px 0 rgba(0,0,0,.22); }
 .ms-lab { font-size: 12px; font-weight: 800; color: #5c5f77; margin-right: 4px; align-self: center; }
+/* 3Dミニゲーム共通（games-3d-kit.js） */
+.g3-cross { display: grid; grid-template-columns: repeat(3, 62px); grid-template-rows: 56px 56px; gap: 6px; }
+.g3-cross .r3d-btn.arrow { min-width: 62px; min-height: 56px; font-size: 24px; padding: 0; }
+.g3-cross .up { grid-column: 2; grid-row: 1; } .g3-cross .left { grid-column: 1; grid-row: 2; } .g3-cross .down { grid-column: 2; grid-row: 2; } .g3-cross .right { grid-column: 3; grid-row: 2; }
+.g3-btns .r3d-btn { min-width: 96px; min-height: 64px; font-size: 17px; }
+.g3-btns .r3d-btn.big { min-width: 108px; min-height: 84px; font-size: 19px; }
+.g3-right { position: absolute; top: 8px; right: 10px; z-index: 3; color: #fff; font-weight: 900; text-align: right; text-shadow: 0 2px 8px rgba(0,0,0,.5); pointer-events: none; background: rgba(16,14,40,.55); border-radius: 14px; padding: 6px 10px; font-size: 13px; line-height: 1.35; }
+.g3-right b { font-size: 20px; }
+.g3-big { font-size: 28px; line-height: 1.05; }
+.g3-gauge { width: 120px !important; height: 10px !important; }
+.g3-gauge i { background: linear-gradient(90deg, #69db7c, #ffe066, #ff6b6b) !important; }
+.g3-help { position: absolute; left: 12px; right: 12px; top: 38%; z-index: 4; text-align: center; color: #fff; font-weight: 800; font-size: 14px; line-height: 1.6; background: rgba(16,14,40,.66); border-radius: 16px; padding: 10px 12px; pointer-events: none; transition: opacity .6s; }
+.g3-help.hide { opacity: 0; }
