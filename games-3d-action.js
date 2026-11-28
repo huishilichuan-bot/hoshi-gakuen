@@ -19,6 +19,164 @@
   }
 
   // =====================================================================
+  // タンクバトル：かべではね返る砲弾で、3台の敵戦車をたおす
+  // =====================================================================
+  HM3D.register({
+    id: "tankbattle", e: "🪖", n: "タンクバトル", c: "#868e96", genre: "battle", title: "タンクバトル",
+    d: "3Dのアリーナで戦車バトル！↑↓で前・後ろ、←→で向きを変える。「発射」の砲弾はかべで1回はね返るよ。3台の敵戦車をすべてたおせば勝ち。",
+    help: "↑↓ で前・後ろ　←→ で向きを変える<br>「発射」（スペース）：砲弾はかべで1回はね返る<br>自分のはね返った弾にも気をつけて",
+    arrows: "cross", buttons: [{ k: "a", label: "発射", cls: "go big" }],
+    sky: 0xf4d6a0, fogCol: 0xf0d8a8, fogNear: 50, fogFar: 140, far: 220, fov: 58,
+    setup(ctx) {
+      const { T, scene, camera, inp, S, FX } = ctx;
+      const D = ctx.diff, sk = ctx.sk, me = partnerColor(T, 0x2f9e44);
+      const A = 22, TR = 1.35, SR = 0.22;
+      // ---- アリーナ ----
+      const sand = new T.MeshLambertMaterial({ map: (() => { const t = noiseTex(T, "#d9b77a", ["#cfa96a", "#e4c48d", "#c49d5c"], 3); t.repeat.set(12, 12); return t; })() });
+      flat(T, scene, 300, 300, sand, 0, 0, 0);
+      const wallM = lam(T, 0x8d8273);
+      [[0, -A - 0.5, 2 * A + 2, 1], [0, A + 0.5, 2 * A + 2, 1], [-A - 0.5, 0, 1, 2 * A + 2], [A + 0.5, 0, 1, 2 * A + 2]].forEach(([x, z, w, d]) => { box(T, scene, w, 2.2, d, 0x8d8273, x, 1.1, z); box(T, scene, w + 0.1, 0.25, d + 0.1, 0xffd43b, x, 2.25, z); });
+      const blocks = [];
+      const addBlock = (x, z, w, d, col, h) => { blocks.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2 }); box(T, scene, w, h || 2.2, d, col || 0x9c8f7d, x, (h || 2.2) / 2, z); };
+      const crateTex = KIT.canvasTex(T, 64, 64, (c, w, h) => { c.fillStyle = "#b07b3f"; c.fillRect(0, 0, w, h); c.strokeStyle = "#7a5228"; c.lineWidth = 6; c.strokeRect(3, 3, w - 6, h - 6); c.beginPath(); c.moveTo(4, 4); c.lineTo(w - 4, h - 4); c.stroke(); });
+      const crateM = new T.MeshLambertMaterial({ map: crateTex });
+      [[-8, -6, 8, 1.6], [8, 6, 8, 1.6], [0, 0, 1.6, 7], [-13, 10, 1.6, 8], [13, -10, 1.6, 8], [-4, 14, 6, 1.6], [4, -14, 6, 1.6]].forEach(([x, z, w, d]) => addBlock(x, z, w, d, 0x9c8f7d, 2.2));
+      [[-15, -15], [15, 15], [16, -2], [-16, 2]].forEach(([x, z]) => { blocks.push({ x0: x - 1.1, x1: x + 1.1, z0: z - 1.1, z1: z + 1.1 }); const m = new T.Mesh(G(T, "crate22", () => new T.BoxGeometry(2.2, 2.2, 2.2)), crateM); m.position.set(x, 1.1, z); scene.add(m); });
+      // まわりの岩・ドラム缶
+      const rr = R01(23), rocks = [], drums = [];
+      for (let i = 0; i < 60; i++) { const a = rr() * Math.PI * 2, d = A + 6 + rr() * 40; rocks.push({ x: Math.cos(a) * d, y: 0.5, z: Math.sin(a) * d, s: 1.5 + rr() * 3.5, ry: rr() * 3 }); }
+      inst(T, scene, new T.DodecahedronGeometry(1, 0), lam(T, 0xb08d5b), rocks);
+      for (let i = 0; i < 10; i++) drums.push({ x: (i % 2 ? 1 : -1) * (A - 0.9), y: 0.6, z: -18 + i * 4 });
+      inst(T, scene, new T.CylinderGeometry(0.45, 0.45, 1.2, 10), lam(T, 0xc92a2a), drums);
+      // ---- 戦車 ----
+      function mkTank(col, dark) {
+        const g = new T.Group(); scene.add(g);
+        const hull = new T.Group(); g.add(hull);
+        box(T, hull, 2.0, 0.6, 2.8, col, 0, 0.7, 0); box(T, hull, 1.8, 0.3, 0.6, dark, 0, 0.95, 1.2);
+        [-1, 1].forEach((s) => { box(T, hull, 0.5, 0.65, 3.1, 0x343a40, s * 1.15, 0.38, 0); for (let i = 0; i < 4; i++) { const w = cyl(T, hull, 0.28, 0.28, 0.52, 10, 0x495057, s * 1.15, 0.32, -1.1 + i * 0.73); w.rotation.z = Math.PI / 2; } });
+        bake(T, hull, true);
+        const tur = new T.Group(); tur.position.y = 1.0; g.add(tur);
+        cyl(T, tur, 0.75, 0.85, 0.5, 12, col, 0, 0.25, 0); box(T, tur, 0.5, 0.2, 0.5, dark, 0.3, 0.55, -0.3);
+        const brl = cyl(T, tur, 0.11, 0.13, 1.8, 8, dark, 0, 0.28, 1.2); brl.rotation.x = Math.PI / 2;
+        bake(T, tur, true);
+        softShadow(T, g, 3.2, 4);
+        return { g, tur };
+      }
+      const mkHp = () => { const m = new T.Mesh(new T.PlaneGeometry(1.8, 0.22), new T.MeshBasicMaterial({ color: 0xff6b6b, depthTest: false })); m.renderOrder = 5; scene.add(m); return m; };
+      const player = Object.assign(mkTank(me, 0x1e5e2a), { x: 0, z: -17, h: 0, th: 0, hp: { easy: 7, normal: 5, hard: 4, ultra: 3 }[D] || 5, cd: 0, me: true, v: 0, dead: false });
+      const ecol = [0x868e96, 0x8a7b52, 0x6c757d];
+      const spawns = [[-14, 17], [14, 17], [0, 19]];
+      const enemies = spawns.map(([x, z], i) => Object.assign(mkTank(ecol[i], 0x343a40), { x, z, h: Math.PI, th: Math.PI, hp: 3, cd: 1.5 + i * 0.7, wp: null, stuck: 0, dead: false, bar: mkHp(), aimErr: 0 }));
+      const tanks = [player].concat(enemies);
+      const ER = { easy: 2.6, normal: 1.8, hard: 1.35, ultra: 1.05 }[D] || 1.8, EACC = { easy: 0.16, normal: 0.1, hard: 0.06, ultra: 0.035 }[D] || 0.1, ESP = { easy: 2.6, normal: 3.2, hard: 3.8, ultra: 4.3 }[D] || 3.2;
+      // ---- 当たり判定 ----
+      function inBlock(x, z, r) { if (Math.abs(x) > A - r || Math.abs(z) > A - r) return true; return blocks.some((b) => x > b.x0 - r && x < b.x1 + r && z > b.z0 - r && z < b.z1 + r); }
+      function pushOut(t) {
+        t.x = clamp(t.x, -A + TR, A - TR); t.z = clamp(t.z, -A + TR, A - TR);
+        blocks.forEach((b) => { const cx = clamp(t.x, b.x0, b.x1), cz = clamp(t.z, b.z0, b.z1), dx = t.x - cx, dz = t.z - cz, d = Math.hypot(dx, dz); if (d < TR) { if (d > 1e-4) { t.x = cx + (dx / d) * TR; t.z = cz + (dz / d) * TR; } else { t.x += TR; } } });
+      }
+      function segHits(x0, z0, x1, z1) { // 見通し（ブロックにさえぎられる？）
+        for (const b of blocks) { let t0 = 0, t1 = 1; const dx = x1 - x0, dz = z1 - z0; let ok = true;
+          for (const [p, d, lo, hi] of [[x0, dx, b.x0 - 0.3, b.x1 + 0.3], [z0, dz, b.z0 - 0.3, b.z1 + 0.3]]) { if (Math.abs(d) < 1e-6) { if (p < lo || p > hi) { ok = false; break; } } else { let a = (lo - p) / d, c = (hi - p) / d; if (a > c) [a, c] = [c, a]; t0 = Math.max(t0, a); t1 = Math.min(t1, c); if (t0 > t1) { ok = false; break; } } }
+          if (ok) return true; }
+        return false;
+      }
+      // ---- 砲弾 ----
+      const shells = [];
+      const shellGeo = new T.SphereGeometry(SR, 8, 6), shellM = new T.MeshBasicMaterial({ color: 0xffe066 }), shellE = new T.MeshBasicMaterial({ color: 0xff6b6b });
+      function fire(t) {
+        const fx = Math.sin(t.th), fz = Math.cos(t.th), x = t.x + fx * 2.3, z = t.z + fz * 2.3;
+        if (inBlock(x, z, SR)) { FX.SFX.hit(); return; }
+        const m = new T.Mesh(shellGeo, t.me ? shellM : shellE); m.position.set(x, 1.28, z); scene.add(m);
+        const sp = t.me ? 19 : 14 * (0.9 + sk * 0.1);
+        shells.push({ m, x, z, vx: fx * sp, vz: fz * sp, b: 0, life: 3.2, owner: t, age: 0 });
+        ctx.fx3.burst(new T.Vector3(x, 1.28, z), [0xffd43b, 0xff922b, 0xffffff], 8, 2.5, 0.25);
+        S.shoot ? S.shoot() : FX.SFX.itemUse(); if (t.me) ctx.shake.add(0.15);
+      }
+      function boom(t) {
+        t.dead = true; ctx.fx3.burst(new T.Vector3(t.x, 1.2, t.z), [0xff922b, 0xffd43b, 0x495057, 0x212529], 40, 6, 1.0); S.boom ? S.boom() : FX.SFX.crash(); ctx.shake.add(0.6);
+        t.g.traverse((o) => { if (o.material && o.material.color && !o.material.map) { o.material = o.material.clone(); o.material.color.multiplyScalar(0.3); } });
+        t.tur.rotation.z = 0.5; t.tur.position.y = 0.85; if (t.bar) t.bar.visible = false;
+      }
+      // ---- 状態 ----
+      let tAll = 0, phase = "play", tEnd = 0, shotsFired = 0, hits = 0;
+      const camL = new T.Vector3();
+      function hud() { const left = enemies.filter((e) => !e.dead).length; ctx.hud({ big: "のこり敵 " + left + "台", sub: "❤".repeat(Math.max(0, player.hp)), sub2: Math.floor(tAll) + "秒", right: "命中 <b>" + hits + "</b>" }); }
+      function pickWp(e) { for (let i = 0; i < 30; i++) { const x = rnd(-A + 3, A - 3), z = rnd(-A + 3, A - 3); if (!inBlock(x, z, TR + 0.6)) { e.wp = { x, z }; return; } } e.wp = { x: 0, z: 10 }; }
+      enemies.forEach(pickWp);
+      hud();
+      return {
+        dbg: () => ({ phase, x: player.x, z: player.z, h: player.h, hp: player.hp, enemies: enemies.map((e) => ({ x: e.x, z: e.z, dead: e.dead, los: !segHits(player.x, player.z, e.x, e.z) })), hits }),
+        step(dt, t) {
+          const go = ctx.st.go && phase === "play";
+          if (go) tAll += dt;
+          // プレイヤー（←→で向き：右を押すと画面の右へ曲がる）
+          if (go && !player.dead) {
+            player.h -= inp.x() * 2.3 * dt;
+            const tv = inp.y() > 0 ? 6.5 : inp.y() < 0 ? -3.8 : 0; player.v = lerp(player.v, tv, Math.min(1, dt * 5));
+            player.x += Math.sin(player.h) * player.v * dt; player.z += Math.cos(player.h) * player.v * dt; pushOut(player);
+            player.th = player.h;
+            // ゆるいねらい補助（8°以内の敵に向ける）
+            let best = null, bd = 0.09; enemies.forEach((e) => { if (e.dead) return; const a = Math.atan2(e.x - player.x, e.z - player.z); let d = a - player.h; d = Math.atan2(Math.sin(d), Math.cos(d)); if (Math.abs(d) < bd && !segHits(player.x, player.z, e.x, e.z)) { bd = Math.abs(d); best = d; } });
+            if (best != null) player.th = player.h + best;
+            player.cd -= dt; if (inp.hit("a") && player.cd <= 0) { fire(player); player.cd = 0.55; shotsFired++; }
+          } else inp.hit("a");
+          // 敵
+          enemies.forEach((e, i) => {
+            if (e.dead || !go) return;
+            const dx = player.x - e.x, dz = player.z - e.z, dist = Math.hypot(dx, dz), los = !player.dead && !segHits(e.x, e.z, player.x, player.z);
+            if (!e.wp || Math.hypot(e.wp.x - e.x, e.wp.z - e.z) < 2 || e.stuck > 2.5) { pickWp(e); e.stuck = 0; if (los && dist > 14 && Math.random() < 0.6) e.wp = { x: e.x + dx * 0.4, z: e.z + dz * 0.4 }; else if (los && dist < 13) { const s2 = Math.random() < 0.5 ? 1 : -1; const wx = e.x + (dz / dist) * 7 * s2 - (dx / dist) * 3, wz = e.z - (dx / dist) * 7 * s2 - (dz / dist) * 3; if (!inBlock(wx, wz, TR + 0.5)) e.wp = { x: wx, z: wz }; } }
+            const want = Math.atan2(e.wp.x - e.x, e.wp.z - e.z); let dh = Math.atan2(Math.sin(want - e.h), Math.cos(want - e.h));
+            e.h += clamp(dh, -1.8 * dt, 1.8 * dt);
+            const sp = Math.abs(dh) < 0.6 ? ESP * (los && dist < 10 ? 0.4 : 1) : 0.6; const ox = e.x, oz = e.z;
+            e.x += Math.sin(e.h) * sp * dt; e.z += Math.cos(e.h) * sp * dt; pushOut(e);
+            if (Math.hypot(e.x - ox, e.z - oz) < sp * dt * 0.3) e.stuck += dt; else e.stuck = Math.max(0, e.stuck - dt);
+            // 砲塔：見えていればプレイヤーへ（少しずれる）
+            const ta = los ? Math.atan2(dx + player.v * Math.sin(player.h) * dist / 14 * 0.6, dz + player.v * Math.cos(player.h) * dist / 14 * 0.6) + e.aimErr : e.h;
+            const dth = Math.atan2(Math.sin(ta - e.th), Math.cos(ta - e.th)); e.th += clamp(dth, -2.2 * dt, 2.2 * dt);
+            e.cd -= dt; if (los && e.cd <= 0 && Math.abs(dth) < 0.08 && dist < 34) { fire(e); e.cd = ER * rnd(0.85, 1.25); e.aimErr = rnd(-1, 1) * EACC * 2; }
+          });
+          // 戦車どうし
+          for (let i = 0; i < tanks.length; i++) for (let j = i + 1; j < tanks.length; j++) { const a = tanks[i], b = tanks[j]; const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz); if (d < TR * 2 && d > 1e-4) { const p = (TR * 2 - d) / 2; if (!a.dead) { a.x -= (dx / d) * p; a.z -= (dz / d) * p; } if (!b.dead) { b.x += (dx / d) * p; b.z += (dz / d) * p; } } }
+          // 砲弾
+          for (let i = shells.length - 1; i >= 0; i--) {
+            const s = shells[i]; s.age += dt; s.life -= dt; let gone = s.life <= 0;
+            const N = 3; for (let k = 0; k < N && !gone; k++) {
+              const h = dt / N, nx = s.x + s.vx * h, nz = s.z + s.vz * h;
+              if (inBlock(nx, nz, SR)) {
+                if (s.b >= 1) { gone = true; ctx.fx3.burst(new T.Vector3(s.x, 1.28, s.z), [0xadb5bd, 0xffd43b], 8, 2, 0.3); FX.SFX.hit(); break; }
+                const bx = inBlock(nx, s.z, SR), bz = inBlock(s.x, nz, SR);
+                if (bx) s.vx *= -1; if (bz) s.vz *= -1; if (!bx && !bz) { s.vx *= -1; s.vz *= -1; }
+                s.b++; ctx.fx3.burst(new T.Vector3(s.x, 1.28, s.z), [0xffffff, 0xffd43b], 6, 2, 0.2); S.bounce ? S.bounce() : FX.SFX.hit();
+              } else { s.x = nx; s.z = nz; }
+              for (const tk of tanks) { if (tk.dead || (tk === s.owner && s.b === 0)) continue; if (Math.hypot(tk.x - s.x, tk.z - s.z) < TR + SR) { gone = true; tk.hp--; if (s.owner.me && !tk.me) hits++; ctx.fx3.burst(new T.Vector3(s.x, 1.3, s.z), [0xff922b, 0xffd43b, 0xffffff], 16, 3.5, 0.45); FX.SFX.crash ? FX.SFX.crash() : 0;
+                  if (tk.me) { ctx.shake.add(0.5); ctx.overlay.flash("#ff6b6b", 0.3); ctx.say(s.owner === tk ? "自分の弾が当たった！" : "当たった！ のこり ❤" + Math.max(0, tk.hp), 1.2); }
+                  else ctx.big(tk.hp > 0 ? "命中！" : "撃破！", 0.8, tk.hp > 0 ? "#ffd43b" : "#69db7c");
+                  if (tk.hp <= 0) boom(tk); hud(); break; } }
+            }
+            if (gone) { scene.remove(s.m); shells.splice(i, 1); } else s.m.position.set(s.x, 1.28, s.z);
+          }
+          // 見た目
+          tanks.forEach((tk) => { tk.g.position.set(tk.x, 0, tk.z); tk.g.rotation.y = tk.h; tk.tur.rotation.y = tk.th - tk.h; if (tk.bar) { tk.bar.position.set(tk.x, 3.1, tk.z); tk.bar.quaternion.copy(camera.quaternion); tk.bar.scale.x = Math.max(0.01, tk.hp / 3); } });
+          // カメラ（戦車のうしろ）
+          const fx = Math.sin(player.h), fz = Math.cos(player.h);
+          camera.position.lerp(new T.Vector3(player.x - fx * 11, 11.5, player.z - fz * 11), Math.min(1, dt * 4)); camL.lerp(new T.Vector3(player.x + fx * 8, 0, player.z + fz * 8), Math.min(1, dt * 5)); camera.lookAt(camL);
+          // 勝ち負け
+          if (phase === "play") {
+            if (player.hp <= 0 && !player.dead) { boom(player); phase = "over"; tEnd = 0; ctx.big("やられた…", 1.6, "#ff8787"); }
+            else if (enemies.every((e) => e.dead)) { phase = "over"; tEnd = 0; ctx.big("ぜんぶ撃破！", 1.6, "#ffe066"); S.cheer && S.cheer(); FX.SFX.finish(); }
+            if ((t * 4 | 0) !== ((t - dt) * 4 | 0)) hud();
+          } else if (phase === "over") {
+            tEnd += dt;
+            if (tEnd > 1.8) { phase = "end"; const win = !player.dead; const left = enemies.filter((e) => !e.dead).length;
+              ctx.end({ win, title: win ? "勝ち！ " + Math.round(tAll) + "秒で全滅" : "負け… のこり " + left + "台", text: "命中 " + hits + "発・発射 " + shotsFired + "発", metric: win ? { v: Math.round(tAll * 10) / 10, unit: "秒", lower: true, label: "クリアタイム" } : null }); }
+          }
+        }
+      };
+    }
+  });
+
+  // =====================================================================
   // スカイダイビング：リングをくぐって、パラシュートで的のまん中に着地
   // =====================================================================
   HM3D.register({
