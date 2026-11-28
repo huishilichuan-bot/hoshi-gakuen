@@ -578,14 +578,14 @@
         return { g, tur };
       }
       const mkHp = () => { const m = new T.Mesh(new T.PlaneGeometry(1.8, 0.22), new T.MeshBasicMaterial({ color: 0xff6b6b, depthTest: false })); m.renderOrder = 5; scene.add(m); return m; };
-      const player = Object.assign(mkTank(me, 0x1e5e2a), { x: 0, z: -17, h: 0, th: 0, hp: { easy: 7, normal: 4, hard: 3, ultra: 3 }[D] || 4, cd: 0, me: true, v: 0, dead: false });
+      const player = Object.assign(mkTank(me, 0x1e5e2a), { x: 0, z: -17, h: 0, th: 0, hp: { easy: 7, normal: 5, hard: 4, ultra: 3 }[D] || 5, cd: 0, me: true, v: 0, dead: false });
       // 第10回：弱い・普通・強いの差をはっきり（敵の体力・ねらい補助）
       const EHP = { easy: 2, normal: 3, hard: 4, ultra: 4 }[D] || 3, AIM = { easy: 0.16, normal: 0.09, hard: 0.05, ultra: 0.035 }[D] || 0.09;
       const ecol = [0x868e96, 0x8a7b52, 0x6c757d];
       const spawns = [[-14, 17], [14, 17], [0, 19]];
       const enemies = spawns.map(([x, z], i) => Object.assign(mkTank(ecol[i], 0x343a40), { x, z, h: Math.PI, th: Math.PI, hp: EHP, cd: (D === "easy" ? 2.5 : 1.2) + i * 0.6, wp: null, stuck: 0, dead: false, bar: mkHp(), aimErr: 0 }));
       const tanks = [player].concat(enemies);
-      const ER = { easy: 2.8, normal: 1.45, hard: 1.0, ultra: 0.8 }[D] || 1.45, EACC = { easy: 0.18, normal: 0.07, hard: 0.035, ultra: 0.02 }[D] || 0.07, ESP = { easy: 2.4, normal: 3.6, hard: 4.4, ultra: 5.0 }[D] || 3.6;
+      const ER = { easy: 2.8, normal: 1.7, hard: 1.25, ultra: 0.95 }[D] || 1.7, EACC = { easy: 0.18, normal: 0.095, hard: 0.05, ultra: 0.03 }[D] || 0.095, ESP = { easy: 2.4, normal: 3.3, hard: 4.0, ultra: 4.6 }[D] || 3.3;
       // ---- 当たり判定 ----
       function inBlock(x, z, r) { if (Math.abs(x) > A - r || Math.abs(z) > A - r) return true; return blocks.some((b) => x > b.x0 - r && x < b.x1 + r && z > b.z0 - r && z < b.z1 + r); }
       function pushOut(t) {
@@ -674,13 +674,13 @@
             if (gone) { scene.remove(s.m); shells.splice(i, 1); } else s.m.position.set(s.x, 1.28, s.z);
           }
           // 見た目
-          tanks.forEach((tk) => { tk.g.position.set(tk.x, 0, tk.z); tk.g.rotation.y = tk.h; tk.tur.rotation.y = tk.th - tk.h; if (tk.bar) { tk.bar.position.set(tk.x, 3.1, tk.z); tk.bar.quaternion.copy(camera.quaternion); tk.bar.scale.x = Math.max(0.01, tk.hp / 3); } });
+          tanks.forEach((tk) => { tk.g.position.set(tk.x, 0, tk.z); tk.g.rotation.y = tk.h; tk.tur.rotation.y = tk.th - tk.h; if (tk.bar) { tk.bar.position.set(tk.x, 3.1, tk.z); tk.bar.quaternion.copy(camera.quaternion); tk.bar.scale.x = Math.max(0.01, tk.hp / EHP); } });
           // カメラ（戦車のうしろ）
           const fx = Math.sin(player.h), fz = Math.cos(player.h);
           camera.position.lerp(new T.Vector3(player.x - fx * 11, 11.5, player.z - fz * 11), Math.min(1, dt * 4)); camL.lerp(new T.Vector3(player.x + fx * 8, 0, player.z + fz * 8), Math.min(1, dt * 5)); camera.lookAt(camL);
           // 勝ち負け
           if (phase === "play") {
-            if (player.hp <= 0 && !player.dead) { boom(player); phase = "over"; tEnd = 0; ctx.big("やられた…", 1.6, "#ff8787"); }
+            if (player.hp <= 0) { if (!player.dead) boom(player); phase = "over"; tEnd = 0; ctx.big("やられた…", 1.6, "#ff8787"); }
             else if (enemies.every((e) => e.dead)) { phase = "over"; tEnd = 0; ctx.big("ぜんぶ撃破！", 1.6, "#ffe066"); S.cheer && S.cheer(); FX.SFX.finish(); }
             if ((t * 4 | 0) !== ((t - dt) * 4 | 0)) hud();
           } else if (phase === "over") {
