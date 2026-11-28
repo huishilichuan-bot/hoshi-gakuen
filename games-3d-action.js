@@ -19,6 +19,192 @@
   }
 
   // =====================================================================
+  // スターストライカー：宇宙を飛ぶ3Dシューティング。さいごのボスをたおせば勝ち
+  // =====================================================================
+  HM3D.register({
+    id: "starfighter", e: "🚀", n: "スターストライカー", c: "#4263eb", genre: "arcade", title: "スターストライカー",
+    d: "3Dの宇宙をとぶシューティング！←↑↓→で自機を動かし、「ショット」長押しで連射。Pアイテムでパワーアップ、「ボム」で画面の敵弾を消せる。さいごの大きなボスをたおせば勝ち。",
+    help: "←↑↓→ で移動（画面の右が右）<br>「ショット」（スペース）長押しで連射<br>「ボム」（X）：敵と敵の弾をまとめて消す（2回）",
+    arrows: "cross", buttons: [{ k: "a", label: "ショット", cls: "go big" }, { k: "b", label: "ボム", cls: "" }],
+    sky: 0x05061a, fog: false, far: 500, fov: 62, countdown: true, goText: "発進！",
+    setup(ctx) {
+      const { T, scene, camera, inp, S, FX } = ctx;
+      const D = ctx.diff, sk = ctx.sk, me = partnerColor(T, 0x4dabf7);
+      const XR = 8, YR = 4.6, SPAWNZ = 140;
+      const EHP = { easy: 0.7, normal: 1, hard: 1.25, ultra: 1.5 }[D] || 1, ESHOT = { easy: 0.6, normal: 0.85, hard: 1.0, ultra: 1.2 }[D] || 0.85;
+      // ---- 宇宙 ----
+      const skyTex = KIT.canvasTex(T, 512, 256, (c, w, h) => { const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, "#05061a"); g.addColorStop(0.5, "#1a1046"); g.addColorStop(1, "#05061a"); c.fillStyle = g; c.fillRect(0, 0, w, h); for (let i = 0; i < 14; i++) { const x = (i * 97) % w, y = 60 + (i * 53) % 140, r = 40 + (i % 5) * 18; const gg = c.createRadialGradient(x, y, 0, x, y, r); gg.addColorStop(0, ["rgba(255,80,200,.22)", "rgba(80,160,255,.22)", "rgba(140,90,255,.2)"][i % 3]); gg.addColorStop(1, "rgba(0,0,0,0)"); c.fillStyle = gg; c.fillRect(x - r, y - r, r * 2, r * 2); } });
+      const skyS = new T.Mesh(new T.SphereGeometry(450, 24, 12), new T.MeshBasicMaterial({ map: skyTex, side: T.BackSide, fog: false })); scene.add(skyS);
+      const planet = new T.Mesh(new T.SphereGeometry(60, 32, 16), new T.MeshLambertMaterial({ map: stripeTex(T, "#5f3dc4", "#7950f2", 9), emissive: 0x1a0f40 })); planet.position.set(-120, -40, 330); scene.add(planet);
+      const ringP = new T.Mesh(new T.RingGeometry(75, 100, 48), new T.MeshBasicMaterial({ color: 0xb197fc, transparent: true, opacity: 0.35, side: T.DoubleSide })); ringP.position.copy(planet.position); ringP.rotation.x = 1.2; scene.add(ringP);
+      const NS = 900, sp = new Float32Array(NS * 3); for (let i = 0; i < NS; i++) { sp[i * 3] = rnd(-60, 60); sp[i * 3 + 1] = rnd(-35, 35); sp[i * 3 + 2] = rnd(0, 300); }
+      const stG = new T.BufferGeometry(); stG.setAttribute("position", new T.BufferAttribute(sp, 3));
+      scene.add(new T.Points(stG, new T.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: false })));
+      scene.add(new T.AmbientLight(0x8899ff, 0.35));
+      // ---- 自機 ----
+      const ship = new T.Group(); scene.add(ship);
+      const body = new T.Group(); ship.add(body);
+      cone(T, body, 0.42, 2.6, 8, 0xf1f3f5, 0, 0, 0.9).rotation.x = Math.PI / 2;
+      box(T, body, 3.6, 0.12, 1.0, me, 0, -0.05, -0.2); box(T, body, 0.12, 0.7, 0.8, me, 0, 0.35, -0.55);
+      [-1.75, 1.75].forEach((x) => box(T, body, 0.16, 0.4, 1.2, 0xadb5bd, x, 0, -0.1));
+      sph(T, body, 0.2, 0x74c0fc, 0, 0.2, 0.55, null, 10, 8).scale.set(1, 0.7, 1.8);
+      bake(T, body, true);
+      const flame = new T.Mesh(new T.ConeGeometry(0.16, 0.9, 8), new T.MeshBasicMaterial({ color: 0xffa94d, transparent: true, opacity: 0.8 })); flame.rotation.x = -Math.PI / 2; flame.position.set(0, 0, -1.2); ship.add(flame);
+      // ---- 物体 ----
+      const shots = [], foes = [], eshots = [], items = [];
+      const laserGeo = new T.BoxGeometry(0.08, 0.08, 1.6), laserM = new T.MeshBasicMaterial({ color: 0x8ce99a });
+      const orbGeo = new T.SphereGeometry(0.32, 10, 8), orbM = new T.MeshBasicMaterial({ color: 0xff6b6b }), orbM2 = new T.MeshBasicMaterial({ color: 0xffa8a8 });
+      const droneGeo = new T.OctahedronGeometry(0.9, 0), droneM = new T.MeshLambertMaterial({ color: 0xff922b, emissive: 0x5a2a00 });
+      const fighterGeo = new T.ConeGeometry(0.9, 2.2, 6), fighterM = new T.MeshLambertMaterial({ color: 0xe64980, emissive: 0x4a0a26 });
+      const rockGeo = new T.DodecahedronGeometry(1.8, 0), rockM = new T.MeshLambertMaterial({ color: 0x8d7b68, flatShading: true });
+      const carrierM = new T.MeshLambertMaterial({ color: 0xffd43b, emissive: 0x6b5200 });
+      const pGeo = new T.BoxGeometry(0.9, 0.9, 0.9), pM = new T.MeshBasicMaterial({ map: textTex(T, "P", { w: 64, h: 64, bg: "#fab005", fg: "#fff", fs: 50 }) });
+      function spawn(type, x, y, z) {
+        let m, hp, r, pts;
+        if (type === "drone" || type === "carrier") { m = new T.Mesh(droneGeo, type === "carrier" ? carrierM : droneM); hp = 1; r = 1.0; pts = type === "carrier" ? 300 : 100; }
+        else if (type === "fighter") { m = new T.Mesh(fighterGeo, fighterM); m.rotation.x = -Math.PI / 2; hp = 3; r = 1.1; pts = 200; }
+        else { m = new T.Mesh(rockGeo, rockM); hp = 6; r = 1.9; pts = 150; }
+        m.position.set(x, y, z); scene.add(m);
+        const f = { type, m, x, y, z, x0: x, y0: y, hp: Math.ceil(hp * EHP), r, pts, t: rnd(0, 6), cd: rnd(0.6, 1.6), vz: type === "rock" ? 26 : type === "fighter" ? 22 : 30 };
+        foes.push(f); return f;
+      }
+      function eshoot(x, y, z, tx, ty, spd) { const m = new T.Mesh(orbGeo, Math.random() < 0.5 ? orbM : orbM2); m.position.set(x, y, z); scene.add(m); const tt = z / spd; eshots.push({ m, x, y, z, vx: (tx - x) / tt, vy: (ty - y) / tt, vz: -spd }); }
+      // ---- ボス ----
+      const boss = new T.Group(); boss.visible = false; scene.add(boss);
+      const bossBody = new T.Group(); boss.add(bossBody);
+      box(T, bossBody, 9, 1.6, 4, 0x495057, 0, 0, 0); box(T, bossBody, 4, 2.6, 5, 0x343a40, 0, 0.4, 0.3); cone(T, bossBody, 1.4, 3, 8, 0x495057, 0, 0, -3).rotation.x = -Math.PI / 2;
+      [-1, 1].forEach((s) => { box(T, bossBody, 3, 0.6, 6, 0x5c5f66, s * 6, -0.2, 0.5); });
+      bake(T, bossBody, true);
+      const core = new T.Mesh(new T.SphereGeometry(1.1, 16, 12), new T.MeshBasicMaterial({ color: 0xff3b3b })); core.position.set(0, 0.4, -2.4); boss.add(core);
+      const cannons = [-1, 1].map((s) => { const c = new T.Mesh(new T.CylinderGeometry(0.8, 0.9, 1.6, 10), new T.MeshLambertMaterial({ color: 0xfab005, emissive: 0x4a3500 })); c.rotation.x = Math.PI / 2; c.position.set(s * 6, -0.2, -2.6); boss.add(c); return { m: c, s, hp: Math.ceil(26 * EHP), dead: false }; });
+      let bossOn = false, bossHp = Math.ceil(70 * EHP), bossHpMax = bossHp, bossT = 0, bossCd = 2, bossDead = false, bz = 160;
+      // ---- 状態 ----
+      let x = 0, y = -0.5, vx = 0, vy = 0, shield = { easy: 7, normal: 5, hard: 4, ultra: 3 }[D] || 5, inv = 0, power = 1, bombs = 2, score = 0, fireCd = 0, tAll = 0, phase = "play", tEnd = 0, waveI = 0, kills = 0;
+      const SH0 = shield;
+      // 出てくる順番（秒, 種類, パターン）
+      const WAVES = [];
+      for (let s = 2; s < 58; s += 2.2) { const k = Math.floor(s / 2.2) % 6; WAVES.push([s, ["vline", "sine", "rock", "fighter", "carrier", "vee"][k]]); }
+      function wave(kind) {
+        if (kind === "vline") for (let i = 0; i < 4; i++) spawn("drone", rnd(-XR, XR), rnd(-YR, YR), SPAWNZ + i * 6);
+        else if (kind === "sine") { const yy = rnd(-3, 3); for (let i = 0; i < 5; i++) { const f = spawn("drone", -6 + i * 3, yy, SPAWNZ + i * 4); f.sine = 1; } }
+        else if (kind === "rock") { spawn("rock", rnd(-6, 6), rnd(-3, 3), SPAWNZ); spawn("rock", rnd(-6, 6), rnd(-3, 3), SPAWNZ + 20); }
+        else if (kind === "fighter") { spawn("fighter", rnd(-6, -1), rnd(-3, 3), SPAWNZ); spawn("fighter", rnd(1, 6), rnd(-3, 3), SPAWNZ + 8); }
+        else if (kind === "carrier") { spawn("carrier", rnd(-5, 5), rnd(-2, 2), SPAWNZ); spawn("drone", rnd(-XR, XR), rnd(-YR, YR), SPAWNZ + 10); }
+        else { for (let i = -2; i <= 2; i++) spawn("drone", i * 2.4, Math.abs(i) * 1.2 - 1, SPAWNZ + Math.abs(i) * 5); }
+      }
+      function hurt() {
+        if (inv > 0 || phase !== "play") return; shield--; inv = 1.4; ctx.shake.add(0.5); ctx.overlay.flash("#ff6b6b", 0.35); FX.SFX.crash(); ctx.fx3.burst(new T.Vector3(x, y, 0), [0xff6b6b, 0xffd43b], 16, 4, 0.4);
+        if (power > 1) { power--; ctx.say("パワーダウン…", 1); }
+        if (shield <= 0) { phase = "over"; tEnd = 0; ship.visible = false; ctx.fx3.burst(new T.Vector3(x, y, 0), [0xff922b, 0xffd43b, 0xffffff], 50, 8, 1.2); S.boom ? S.boom() : FX.SFX.crash(); ctx.big("やられた…", 1.6, "#ff8787"); }
+        hud();
+      }
+      function kill(f, i) { score += f.pts; kills++; ctx.fx3.burst(new T.Vector3(f.x, f.y, f.z), f.type === "rock" ? [0x8d7b68, 0xced4da] : [0xff922b, 0xffd43b, 0xffffff], 18, 5, 0.5); FX.SFX.hit(); if (f.type === "carrier") { const m = new T.Mesh(pGeo, pM); m.position.set(f.x, f.y, f.z); scene.add(m); items.push({ m, x: f.x, y: f.y, z: f.z }); } scene.remove(f.m); foes.splice(i, 1); }
+      function bomb() {
+        if (bombs <= 0 || phase !== "play") return; bombs--; ctx.overlay.flash("#ffffff", 0.5); ctx.shake.add(0.6); S.boom ? S.boom() : FX.SFX.crash(); ctx.big("ボム！", 0.8, "#ffe066");
+        for (let i = foes.length - 1; i >= 0; i--) if (foes[i].z < 100) kill(foes[i], i);
+        eshots.forEach((e) => scene.remove(e.m)); eshots.length = 0;
+        if (bossOn && !bossDead) dmgBoss(15, true);
+        hud();
+      }
+      function dmgBoss(n, any) {
+        const alive = cannons.filter((c) => !c.dead);
+        bossHp -= alive.length && !any ? n * 0.35 : n; core.material.color.setHex(0xffffff); setTimeout(() => core.material.color.setHex(0xff3b3b), 60);
+        if (bossHp <= 0 && !bossDead) { bossDead = true; score += 5000; phase = "over"; tEnd = 0; ctx.big("ボス撃破！", 2, "#ffe066"); S.cheer && S.cheer(); FX.SFX.finish(); for (let k = 0; k < 4; k++) setTimeout(() => { if (!ctx.st.dead) { ctx.fx3.burst(new T.Vector3(rnd(-6, 6), rnd(-1, 2), bz), [0xff922b, 0xffd43b, 0xffffff], 40, 9, 1.2); ctx.shake.add(0.5); } }, k * 250); }
+      }
+      function hud() { ctx.hud({ big: score + "", sub: "シールド " + "■".repeat(Math.max(0, shield)) + "□".repeat(Math.max(0, SH0 - shield)), sub2: "パワー " + power + "・ボム " + bombs, right: bossOn ? "ボス" : Math.max(0, Math.ceil(60 - tAll)) + "秒", gauge: bossOn ? Math.max(0, bossHp / bossHpMax) : -1, gaugeCol: "#ff6b6b" }); }
+      const camL = new T.Vector3(0, 0, 20);
+      hud();
+      return {
+        dbg: () => ({ phase, x, y, score, shield, power, bombs, bossOn, bossHp, foes: foes.filter((f) => f.z > 2 && f.z < 90).map((f) => ({ x: f.x, y: f.y, z: f.z })), shots: eshots.filter((e) => e.z < 25 && e.z > 0).map((e) => ({ x: e.x, y: e.y, z: e.z })), boss: bossOn ? { x: boss.position.x, z: bz, cannons: cannons.filter((c) => !c.dead).map((c) => boss.position.x + c.s * 6) } : null }),
+        step(dt, t) {
+          const go = ctx.st.go && phase === "play";
+          // 星が流れる
+          const arr = stG.attributes.position.array; for (let i = 2; i < arr.length; i += 3) { arr[i] -= dt * 60; if (arr[i] < -10) arr[i] += 310; } stG.attributes.position.needsUpdate = true;
+          planet.rotation.y += dt * 0.05;
+          if (go) {
+            tAll += dt;
+            const ax = -inp.x(), ay = inp.y();
+            vx = lerp(vx, ax * 11, Math.min(1, dt * 8)); vy = lerp(vy, ay * 8, Math.min(1, dt * 8));
+            x = clamp(x + vx * dt, -XR, XR); y = clamp(y + vy * dt, -YR, YR);
+            inv = Math.max(0, inv - dt);
+            fireCd -= dt;
+            if (inp.held.a && fireCd <= 0) {
+              fireCd = 0.11; const L = (dx, ddx) => { const m = new T.Mesh(laserGeo, laserM); m.position.set(x + dx, y, 1.2); scene.add(m); shots.push({ m, x: x + dx, y, z: 1.2, vx: ddx }); };
+              if (power === 1) L(0, 0); else if (power === 2) { L(-0.6, 0); L(0.6, 0); } else { L(-0.6, 0); L(0.6, 0); L(-0.9, -9); L(0.9, 9); }
+              if ((t * 20 | 0) % 2 === 0) FX.tone && FX.tone(880, 0.04, "square", 0.03, 660);
+            }
+            if (inp.hit("b")) bomb();
+            // 出てくる
+            while (waveI < WAVES.length && tAll >= WAVES[waveI][0]) { wave(WAVES[waveI][1]); waveI++; }
+            if (!bossOn && tAll > 62) { bossOn = true; boss.visible = true; ctx.big("ボスがきた！", 1.8, "#ff6b6b"); FX.SFX.countdown && FX.SFX.countdown(); }
+          } else { inp.hit("b"); }
+          // 自機
+          ship.position.set(x, y, 0); body.rotation.z = -vx * 0.022; body.rotation.x = -vy * 0.02; ship.visible = phase !== "over" || shield > 0 ? (inv > 0 ? (t * 20 | 0) % 2 === 0 : true) : false;
+          if (shield <= 0) ship.visible = false;
+          flame.scale.y = 0.8 + Math.sin(t * 40) * 0.2;
+          // レーザー
+          for (let i = shots.length - 1; i >= 0; i--) {
+            const s = shots[i], z0 = s.z; s.z += 95 * dt; s.x += s.vx * dt; let hit = false;
+            for (let j = foes.length - 1; j >= 0 && !hit; j--) { const f = foes[j]; if (f.z + f.r >= z0 && f.z - f.r <= s.z + 0.8 && Math.hypot(f.x - s.x, f.y - s.y) < f.r) { hit = true; f.hp--; f.m.scale.setScalar(1.15); if (f.hp <= 0) kill(f, j); else FX.tone && FX.tone(300, 0.03, "square", 0.03); } }
+            if (!hit && bossOn && !bossDead && s.z >= bz - 3 && z0 <= bz + 2) {
+              const bx = boss.position.x;
+              for (const c of cannons) { if (!c.dead && Math.hypot(bx + c.s * 6 - s.x, -0.2 - s.y + boss.position.y * 0) < 1.3) { hit = true; c.hp--; c.m.material.emissive.setHex(0xffffff); setTimeout(() => c.m.material.emissive.setHex(0x4a3500), 50); if (c.hp <= 0) { c.dead = true; c.m.visible = false; score += 1500; ctx.big("砲台をこわした！", 1.2, "#ffd43b"); ctx.fx3.burst(new T.Vector3(bx + c.s * 6, -0.2, bz - 2.6), [0xff922b, 0xffd43b], 30, 6, 0.8); ctx.shake.add(0.4); } break; } }
+              if (!hit && Math.abs(s.x - bx) < 4.5 && Math.abs(s.y - 0.2) < 1.8) { hit = true; dmgBoss(1); }
+            }
+            if (hit || s.z > 160) { scene.remove(s.m); shots.splice(i, 1); } else s.m.position.set(s.x, s.y, s.z);
+          }
+          // 敵
+          for (let i = foes.length - 1; i >= 0; i--) {
+            const f = foes[i]; f.t += dt; f.m.scale.lerp(new T.Vector3(1, 1, 1), dt * 10);
+            if (go) { f.z -= f.vz * dt * (f.z > 70 ? 1.6 : 1); if (f.sine) f.x = f.x0 + Math.sin(f.t * 2.2) * 3; if (f.type === "drone" && !f.sine) f.y = f.y0 + Math.sin(f.t * 1.8) * 1.2; }
+            f.m.rotation.y += dt * 2; if (f.type === "rock") f.m.rotation.x += dt;
+            if (f.type === "fighter") { f.m.rotation.y = 0; f.m.rotation.z += dt * 3; f.x += (x - f.x) * dt * 0.3; if (go && f.z < 75 && f.z > 25) { f.cd -= dt; if (f.cd <= 0) { f.cd = rnd(1.0, 1.6) / ESHOT; eshoot(f.x, f.y, f.z, x, y, 24 * ESHOT + 8); } } }
+            f.m.position.set(f.x, f.y, f.z);
+            if (f.z < 1.2 && f.z > -1.2 && Math.hypot(f.x - x, f.y - y) < f.r + 0.6) { hurt(); kill(f, i); continue; }
+            if (f.z < -8) { scene.remove(f.m); foes.splice(i, 1); }
+          }
+          // 敵の弾
+          for (let i = eshots.length - 1; i >= 0; i--) {
+            const e = eshots[i]; if (go) { e.x += e.vx * dt; e.y += e.vy * dt; e.z += e.vz * dt; }
+            e.m.position.set(e.x, e.y, e.z);
+            if (e.z < 0.6 && e.z > -0.6 && Math.hypot(e.x - x, e.y - y) < 0.75) { hurt(); scene.remove(e.m); eshots.splice(i, 1); continue; }
+            if (e.z < -6) { scene.remove(e.m); eshots.splice(i, 1); }
+          }
+          // アイテム
+          for (let i = items.length - 1; i >= 0; i--) {
+            const it = items[i]; it.z -= 20 * dt; it.x += (x - it.x) * dt * 1.2; it.y += (y - it.y) * dt * 1.2; it.m.rotation.y += dt * 3; it.m.position.set(it.x, it.y, it.z);
+            if (Math.abs(it.z) < 1.5 && Math.hypot(it.x - x, it.y - y) < 1.4) { if (power < 3) { power++; ctx.big("パワーアップ！", 1, "#ffd43b"); } else { score += 500; ctx.big("+500", 0.8, "#ffd43b"); } FX.SFX.itemGet(); scene.remove(it.m); items.splice(i, 1); hud(); continue; }
+            if (it.z < -6) { scene.remove(it.m); items.splice(i, 1); }
+          }
+          // ボス
+          if (bossOn) {
+            bossT += dt; bz = Math.max(48, bz - dt * 25);
+            boss.position.set(Math.sin(bossT * 0.5) * 4, Math.sin(bossT * 0.8) * 1.2, bz); boss.rotation.z = Math.sin(bossT * 0.5) * 0.08;
+            core.scale.setScalar(1 + Math.sin(t * 8) * 0.08);
+            if (go && bz <= 50 && !bossDead) {
+              bossCd -= dt;
+              if (bossCd <= 0) {
+                const pat = Math.floor(bossT / 4) % 3, bx = boss.position.x, by = boss.position.y, spd = 20 * ESHOT + 8;
+                if (pat === 0) { for (let k = -2; k <= 2; k++) eshoot(bx, by, bz - 3, x + k * 2.5, y, spd); bossCd = 1.8 / ESHOT; }
+                else if (pat === 1) { cannons.forEach((c) => { if (!c.dead) eshoot(bx + c.s * 6, by - 0.2, bz - 3, x, y, spd + 4); }); bossCd = 0.7 / ESHOT; }
+                else { for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2 + bossT; eshoot(bx, by, bz - 3, bx + Math.cos(a) * 7, by + Math.sin(a) * 4, spd - 4); } bossCd = 2.2 / ESHOT; }
+              }
+            }
+          }
+          // カメラ
+          camera.position.lerp(new T.Vector3(x * 0.55, y * 0.5 + 2.3, -9.5), Math.min(1, dt * 5)); camL.lerp(new T.Vector3(x * 0.6, y * 0.5, 24), Math.min(1, dt * 5)); camera.lookAt(camL);
+          if ((t * 5 | 0) !== ((t - dt) * 5 | 0)) hud();
+          if (phase === "over") {
+            tEnd += dt;
+            if (tEnd > 2.2) { phase = "end"; const win = bossDead;
+              ctx.end({ win, title: win ? "クリア！ " + score + "点" : "ゲームオーバー " + score + "点", text: "たおした敵 " + kills + "・のこりシールド " + Math.max(0, shield), metric: { v: score, unit: "点", lower: false, label: "スコア" } }); }
+          }
+        }
+      };
+    }
+  });
+
+  // =====================================================================
   // 雪合戦ロイヤル：6人で雪玉を投げ合い、さいごまで残った人の勝ち
   // =====================================================================
   HM3D.register({
