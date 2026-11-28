@@ -24,9 +24,9 @@
   HM3D.register({
     id: "baseball", e: "⚾", n: "ホームランバッター", c: "#2e8b57", genre: "sports",
     title: "ホームランバッター",
-    d: "3Dの球場でバッターになるよ。画面を指でなぞってミートカーソル（丸）を動かし、投げる前に出る青い丸（球が来る場所）を目印に、ボールに合わせて「打つ」。球はぜんぶストライク。10球で相手チームより多く点をとれば勝ち。",
-    help: "指でなぞって（矢印キーでも）ミートカーソル（丸）を動かす<br>投げる前に出る青い丸が、球の来る場所<br>ボールが来たら「打つ」（スペース／画面をタップ）",
-    arrows: "cross", buttons: [{ k: "a", label: "打つ", cls: "go big" }],
+    d: "3Dの球場でバッターになるよ。画面のどこでも指をなぞると、バット型のミートカーソルが同じ向きに動く。投げる前に出る青い丸（球が来る場所）にバットの赤い芯を合わせて、ボールが来たら指をはなすとスイング！球はぜんぶストライク。10球で相手チームより多く点をとれば勝ち。",
+    help: "画面のどこでも指をなぞると、バット（ミートカーソル）が同じ向きに動く（矢印キーでも）<br>バットの赤い「芯」を、投げる前に出る青い丸に合わせよう<br>ボールが来たら、指をはなすとスイング！（スペースでも振れる）",
+    arrows: "none", buttons: [],
     sky: 0x8fc4ff, fogNear: 120, fogFar: 320, far: 400, fov: 50, countdown: false,
     setup(ctx) {
       const { T, scene, camera, inp, S, FX } = ctx;
@@ -111,21 +111,45 @@
       zl.position.set(0, (ZONE.y0 + ZONE.y1) / 2, 0); zoneG.add(zl);
       for (let i = 1; i < 3; i++) { const v = new T.Mesh(G(T, "zv", () => new T.PlaneGeometry(0.006, ZONE.y1 - ZONE.y0)), new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 })); v.position.set(ZONE.x0 + (ZONE.x1 - ZONE.x0) * i / 3, (ZONE.y0 + ZONE.y1) / 2, 0); zoneG.add(v); const h = new T.Mesh(G(T, "zh", () => new T.PlaneGeometry(ZONE.x1 - ZONE.x0, 0.006)), v.material); h.position.set(0, ZONE.y0 + (ZONE.y1 - ZONE.y0) * i / 3, 0); zoneG.add(h); }
       const cur = new T.Group(); zoneG.add(cur);
-      const ring = new T.Mesh(new T.RingGeometry(RC - 0.012, RC, 32), new T.MeshBasicMaterial({ color: 0xffe066, transparent: true, opacity: 0.95, side: T.DoubleSide, depthTest: false })); cur.add(ring);
-      const fillM = new T.Mesh(new T.CircleGeometry(RC, 32), new T.MeshBasicMaterial({ color: 0xffe066, transparent: true, opacity: 0.16, side: T.DoubleSide, depthTest: false, depthWrite: false })); cur.add(fillM);
-      const dot = new T.Mesh(new T.CircleGeometry(0.018, 12), new T.MeshBasicMaterial({ color: 0xff6b6b, side: T.DoubleSide, depthTest: false })); cur.add(dot);
-      ring.renderOrder = fillM.renderOrder = dot.renderOrder = 10;
+      // バット型のミートカーソル（プロ野球ゲームのように横長のバット。赤い丸が「芯」＝当たり判定の中心）
+      const BL = 0.3 + 2 * RC; // バット全体の長さ（m）
+      const batTex = KIT.canvasTex(T, 512, 128, (c, w, h) => {
+        const ppm = w / BL, cy = h / 2, sx = (0.3 + RC) * ppm; // 芯の位置
+        const hx0 = 0.03 * ppm, bx0 = sx - RC * 1.05 * ppm, bx1 = sx + RC * ppm;
+        c.lineJoin = "round"; c.lineCap = "round";
+        // バットの形：ノブ → グリップ → だんだん太く → バレル（先は丸い）
+        c.beginPath(); c.moveTo(hx0, cy - 0.028 * ppm); c.lineTo(bx0 - 0.1 * ppm, cy - 0.016 * ppm); c.quadraticCurveTo(bx0 + 0.05 * ppm, cy - 0.02 * ppm, bx0 + 0.16 * ppm, cy - 0.052 * ppm);
+        c.lineTo(bx1 - 0.05 * ppm, cy - 0.054 * ppm); c.quadraticCurveTo(bx1 + 0.012 * ppm, cy - 0.054 * ppm, bx1 + 0.012 * ppm, cy); c.quadraticCurveTo(bx1 + 0.012 * ppm, cy + 0.054 * ppm, bx1 - 0.05 * ppm, cy + 0.054 * ppm);
+        c.lineTo(bx0 + 0.16 * ppm, cy + 0.052 * ppm); c.quadraticCurveTo(bx0 + 0.05 * ppm, cy + 0.02 * ppm, bx0 - 0.1 * ppm, cy + 0.016 * ppm); c.lineTo(hx0, cy + 0.028 * ppm); c.closePath();
+        const gr = c.createLinearGradient(0, cy - 0.054 * ppm, 0, cy + 0.054 * ppm); gr.addColorStop(0, "#f3d29a"); gr.addColorStop(0.5, "#d9a066"); gr.addColorStop(1, "#a9733a");
+        c.fillStyle = gr; c.fill(); c.lineWidth = 5; c.strokeStyle = "#4a2e12"; c.stroke();
+        // グリップ（黒いテープ）
+        c.fillStyle = "#2b2b2b"; c.fillRect(hx0 + 0.02 * ppm, cy - 0.021 * ppm, (bx0 - hx0) - 0.14 * ppm, 0.042 * ppm);
+        c.fillStyle = "#d9a066"; c.beginPath(); c.arc(hx0 - 0.005 * ppm, cy, 0.034 * ppm, 0, 7); c.fill(); c.lineWidth = 4; c.stroke();
+        // 芯：赤い丸（まんなか）
+        c.beginPath(); c.arc(sx, cy, 0.062 * ppm, 0, 7); c.fillStyle = "rgba(255,80,80,.85)"; c.fill(); c.lineWidth = 6; c.strokeStyle = "#ffffff"; c.stroke();
+        c.beginPath(); c.arc(sx, cy, 0.024 * ppm, 0, 7); c.fillStyle = "#fff3bf"; c.fill();
+      });
+      const batCur = new T.Mesh(new T.PlaneGeometry(BL, BL / 4), new T.MeshBasicMaterial({ map: batTex, transparent: true, side: T.DoubleSide, depthTest: false, depthWrite: false }));
+      batCur.rotation.y = Math.PI; batCur.position.x = 0.15; batCur.renderOrder = 10; cur.add(batCur); // 後ろから見るので向きを回す。持ち手が画面の左
+      const ring = new T.Mesh(new T.RingGeometry(RC - 0.008, RC, 40), new T.MeshBasicMaterial({ color: 0xffe066, transparent: true, opacity: 0.4, side: T.DoubleSide, depthTest: false })); cur.add(ring); // 打てるはんい（うすく）
+      const fillM = new T.Mesh(new T.CircleGeometry(RC, 32), new T.MeshBasicMaterial({ color: 0xffe066, transparent: true, opacity: 0.1, side: T.DoubleSide, depthTest: false, depthWrite: false })); cur.add(fillM);
+      ring.renderOrder = fillM.renderOrder = 9;
       const markTex = KIT.canvasTex(T, 128, 128, (c) => { const gr = c.createRadialGradient(64, 64, 4, 64, 64, 62); gr.addColorStop(0, "rgba(40,130,255,.85)"); gr.addColorStop(0.6, "rgba(40,130,255,.65)"); gr.addColorStop(0.82, "rgba(190,230,255,.95)"); gr.addColorStop(1, "rgba(116,192,252,0)"); c.fillStyle = gr; c.fillRect(0, 0, 128, 128); });
       const mark = new T.Mesh(new T.PlaneGeometry(MK_R * 2, MK_R * 2), new T.MeshBasicMaterial({ map: markTex, transparent: true, opacity: 0, side: T.DoubleSide, depthTest: false, depthWrite: false })); mark.renderOrder = 9; zoneG.add(mark);
       // 画面を指でなぞる／マウスでカーソルを動かす（ストライクゾーンの面に当てる）
       const dom = ctx.renderer.domElement; dom.style.touchAction = "none";
       const ray = new T.Raycaster(), ndc = new T.Vector2(), zPlane = new T.Plane(new T.Vector3(0, 0, 1), -CZ), hitV = new T.Vector3();
       let tapSwing = false, ptr = null;
+      const CUMAX = 0.42, CVMIN = 0.32, CVMAX = 1.3; // カーソルが動ける範囲（ストライクゾーンのまわり）
+      const toPx = (x, y) => { const v = new T.Vector3(x, y, CZ); camera.updateMatrixWorld(); v.project(camera); const r = dom.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; };
       const aimAt = (e) => { const r = dom.getBoundingClientRect(); if (!r.width) return; ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); camera.updateMatrixWorld(); ray.setFromCamera(ndc, camera); if (ray.ray.intersectPlane(zPlane, hitV)) { cu = clamp(-hitV.x, -0.7, 0.7); cv = clamp(hitV.y, 0.1, 1.7); } };
       const offUI = (e) => !!(e.target && e.target.closest && e.target.closest("button,[data-hold]"));
-      const onPD = (e) => { if (offUI(e)) return; ptr = { id: e.pointerId, t0: performance.now(), x0: e.clientX, y0: e.clientY, moved: false }; aimAt(e); if (e.pointerType === "mouse") tapSwing = true; };
-      const onPM = (e) => { if (ptr && ptr.id === e.pointerId) { if (Math.hypot(e.clientX - ptr.x0, e.clientY - ptr.y0) > 12) ptr.moved = true; aimAt(e); } else if (e.pointerType === "mouse" && !offUI(e)) aimAt(e); };
-      const onPU = (e) => { if (ptr && ptr.id === e.pointerId) { if (e.pointerType !== "mouse" && !ptr.moved && performance.now() - ptr.t0 < 260) tapSwing = true; ptr = null; } };
+      // 相対移動：画面のどこをさわってもカーソルは飛ばない。指を動かした分だけ、同じ向き・同じ量だけカーソルが動く（指をはなしても、その場に残る）
+      const ppmNow = () => { const a = toPx(0, 0.8), b = toPx(0.1, 0.8); return Math.max(20, Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.1); };
+      const onPD = (e) => { if (offUI(e)) return; ptr = { id: e.pointerId, lx: e.clientX, ly: e.clientY, ppm: ppmNow() }; };
+      const onPM = (e) => { if (!ptr || ptr.id !== e.pointerId) return; cu = clamp(cu + (e.clientX - ptr.lx) / ptr.ppm, -CUMAX, CUMAX); cv = clamp(cv - (e.clientY - ptr.ly) / ptr.ppm, CVMIN, CVMAX); ptr.lx = e.clientX; ptr.ly = e.clientY; };
+      const onPU = (e) => { if (ptr && ptr.id === e.pointerId) { ptr = null; if (e.type === "pointerup") tapSwing = true; } }; // 指をはなした しゅんかんにスイング（投げたあとだけ）
       ctx.body.addEventListener("pointerdown", onPD); ctx.body.addEventListener("pointermove", onPM); ctx.body.addEventListener("pointerup", onPU); ctx.body.addEventListener("pointercancel", onPU);
       ctx.st.unbind.push(() => { ctx.body.removeEventListener("pointerdown", onPD); ctx.body.removeEventListener("pointermove", onPM); ctx.body.removeEventListener("pointerup", onPU); ctx.body.removeEventListener("pointercancel", onPU); });
       const handV = new T.Vector3();
@@ -166,8 +190,8 @@
       function posAt(p, t, out) { return out.copy(p.p0).addScaledVector(p.v0, t).addScaledVector(p.a, 0.5 * t * t); }
       const tmp = new T.Vector3();
       function hitBall(q, e, dx, dy) {
-        const ev = 14 + 21 * q + (q > 0.82 ? 6 : 0);
-        const theta = clamp(24 - (dy / RC) * 32 + (Math.random() - 0.5) * 6, -12, 72) * Math.PI / 180;
+        const ev = 14.5 + 23 * q + 12 * Math.max(0, q - 0.75);
+        const theta = clamp(24 - (dy / RC) * 26 + (Math.random() - 0.5) * 6, -6, 62) * Math.PI / 180;
         const phi = clamp((e / EMAX) * 0.72 + dx * 0.9 + (Math.random() - 0.5) * 0.1, -1.1, 1.1);
         fly = { p: ball.position.clone(), v: new T.Vector3(Math.sin(phi) * Math.cos(theta) * ev, Math.sin(theta) * ev, Math.cos(phi) * Math.cos(theta) * ev), phi, theta, ev, q, t: 0, landed: false, bounces: 0, out: null };
         S.bat(); FX.SFX.hit(); ctx.shake.add(q > 0.8 ? 6 : 3);
@@ -242,7 +266,7 @@
               if (!(tOK && pOK)) log.push("miss e" + e.toFixed(3) + " d" + d.toFixed(3));
               if (tOK && pOK) {
                 let q = clamp((1 - d / RR) * Math.sqrt(1 - Math.abs(e) / EMAX) * 1.08, 0, 1);
-                if (tm === "just" && d < RR * 0.6) q = Math.max(q, 0.9); // ジャスト＋芯はしっかり飛ぶ
+                if (tm === "just" && d < RR * 0.6) q = Math.max(q, 0.86); // ジャスト＋芯はしっかり飛ぶ
                 lastSwing.q = q;
                 ball.position.set(pitch.target.x, pitch.target.y, CZ);
                 hitBall(q, e, -dx * 2, cy - pitch.target.y);
@@ -275,7 +299,7 @@
             if (!f.land) { // 落下点を予測
               const vy = f.v.y, tt = (vy + Math.sqrt(vy * vy + 2 * 9.8 * Math.max(0, f.p.y))) / 9.8; f.land = new T.Vector3(f.p.x + f.v.x * tt * 0.9, 0, f.p.z + f.v.z * tt * 0.9); f.tLand = tt;
               let best = null, bd = 1e9; fielders.forEach((fd) => { const dd = fd.g.position.distanceTo(f.land); if (dd < bd) { bd = dd; best = fd; } }); f.fd = best;
-              const reach = 7.5 * f.tLand + (ctx.diff === "easy" ? 1 : ctx.diff === "ultra" ? 5 : 3);
+              const reach = 6.4 * f.tLand + (ctx.diff === "easy" ? 0 : ctx.diff === "hard" ? 3 : ctx.diff === "ultra" ? 4.5 : 1);
               f.catchable = !foul && f.theta > 0.17 && bd < reach && Math.hypot(f.land.x, f.land.z) < fenceR(Math.atan2(f.land.x, f.land.z)) - 1;
             }
             if (f.fd) { const fd = f.fd; const to = (f.catchable ? f.land : new T.Vector3(f.p.x, 0, f.p.z)).clone().sub(fd.g.position); to.y = 0; const dl = to.length(); if (dl > 0.3) { const sp = Math.min(dl, 7.5 * dt); fd.g.position.addScaledVector(to.normalize(), sp); fd.g.rotation.y = Math.atan2(to.x, to.z); runPose(fd, t * 14, 1); } else runPose(fd, 0, 0); }

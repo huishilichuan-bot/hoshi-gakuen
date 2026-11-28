@@ -62,17 +62,37 @@ with sync_playwright() as p:
     ok("弱いは普通より遅い・強いは普通より速い", min(x["Tt"] for x in res["easy"]) > max(x["Tt"] for x in res["normal"]) * 0.95 and max(x["Tt"] for x in res["ultra"]) < min(x["Tt"] for x in res["normal"]) * 1.02, {k: [round(x["Tt"], 2) for x in v] for k, v in res.items()})
     # ---- 指（タップ）でカーソル ----
     open_game(pg, "normal"); pg.wait_for_timeout(1500)
-    for (fx, fy) in [(150, 480), (240, 540)]:
-        pg.touchscreen.tap(fx, fy); pg.wait_for_timeout(120)
-        sc = pg.evaluate("""() => { const s = window.__G3D, d = s.game.dbg(), v = new s.camera.position.constructor(-d.cu, d.cv, 0.35); s.camera.updateMatrixWorld(); v.project(s.camera); const r = s.renderer.domElement.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; }""")
-        ok(f"タップした場所 {fx},{fy} にカーソルがつく", abs(sc[0] - fx) < 12 and abs(sc[1] - fy) < 12, sc)
-    # ---- タップで振れる ----
+    ok("カーソルを動かす上下左右ボタンも「打つ」ボタンもない", pg.evaluate("document.querySelectorAll('[data-hold=\"left\"],[data-hold=\"right\"],[data-hold=\"up\"],[data-hold=\"down\"]').length") == 0 and pg.evaluate("document.querySelectorAll('[data-hold]').length") == 0)
+    PX = """() => { const s = window.__G3D, d = s.game.dbg(), v = new s.camera.position.constructor(-d.cu, d.cv, 0.35); s.camera.updateMatrixWorld(); v.project(s.camera); const r = s.renderer.domElement.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; }"""
+    cdp = ctx.new_cdp_session(pg)
+    def touch(typ, x, y): cdp.send("Input.dispatchTouchEvent", {"type": typ, "touchPoints": [] if typ == "touchEnd" else [{"x": x, "y": y, "id": 1}]})
+    c0 = pg.evaluate(PX)
+    pg.touchscreen.tap(300, 250); pg.wait_for_timeout(150)
+    c1 = pg.evaluate(PX)
+    ok("さわっただけではカーソルが飛ばない", abs(c1[0] - c0[0]) < 2 and abs(c1[1] - c0[1]) < 2, (c0, c1))
+    x0, y0 = 120, 560
+    touch("touchStart", x0, y0)
+    for i in range(1, 9): touch("touchMove", x0 + i * 5, y0 - i * 2.5); pg.wait_for_timeout(30)
+    c2 = pg.evaluate(PX)
+    ok("指を動かした分だけ（同じ向き・同じ量）カーソルが動く", abs((c2[0] - c1[0]) - 40) < 6 and abs((c2[1] - c1[1]) - (-20)) < 6, (c1, c2))
+    touch("touchEnd", 0, 0); pg.wait_for_timeout(200)
+    c3 = pg.evaluate(PX)
+    ok("指をはなしてもカーソルはその場に残る", abs(c3[0] - c2[0]) < 2 and abs(c3[1] - c2[1]) < 2, (c2, c3))
+    touch("touchStart", 60, 400)
+    for i in range(1, 25): touch("touchMove", 60 + i * 15, 400 - i * 12); pg.wait_for_timeout(15)
+    touch("touchEnd", 0, 0); pg.wait_for_timeout(150)
+    dd = pg.evaluate("window.__G3D.game.dbg()")
+    ok("ゾーンから出すぎない（はんいを制限）", abs(dd["cu"]) <= 0.43 and 0.31 <= dd["cv"] <= 1.31 and (abs(dd["cu"]) > 0.4 or dd["cv"] > 1.25), (dd["cu"], dd["cv"]))
+    # ---- 指をはなすとスイング（投げる前は振らない）----
+    pg.touchscreen.tap(250, 300); pg.wait_for_timeout(200)
+    ok("投げる前に指をはなしても振らない", dbg(pg)["lastSwing"] is None and dbg(pg)["phase"] in ("wait", "windup"), (dbg(pg)["lastSwing"], dbg(pg)["phase"]))
     for _ in range(600):
         if dbg(pg)["pitch"]: break
         pg.wait_for_timeout(20)
-    pg.touchscreen.tap(195, 330); pg.wait_for_timeout(500)
-    d = dbg(pg)
-    ok("タップで振れる（スイング判定が出る）", d["lastSwing"] is not None, d["lastSwing"])
+    touch("touchStart", 200, 600); touch("touchMove", 210, 590); pg.wait_for_timeout(60)
+    ok("指をおいている間は振らない", dbg(pg)["lastSwing"] is None)
+    touch("touchEnd", 0, 0); pg.wait_for_timeout(600)
+    ok("指をはなすとスイングする（スイング判定が出る）", dbg(pg)["lastSwing"] is not None, dbg(pg)["lastSwing"])
     close_game(pg)
     # ---- ボット（ジャスト）で 1 ゲーム ----
     open_game(pg, "normal"); pg.wait_for_timeout(500)
@@ -94,6 +114,8 @@ with sync_playwright() as p:
     ok("ボットがジャストで打てる（ジャスト 6 回以上）", just >= 6, [s["tm"] for s in swings])
     hrs = [l for l in log if l.startswith("HR")]
     ok("ジャストはよく飛ぶ（ホームラン 3 本以上）", len(hrs) >= 3, log)
+    okh = [l for l in log if l.split(":")[0] in ("HR", "2B", "H")]
+    ok("ジャストならヒット以上が半分以上", len(okh) >= 5, log)
     ok("ボール球の判定が出ない", not any(l.startswith("B") for l in log), log)
     ok("エラーなし", not errs, errs[:3])
     br.close()

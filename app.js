@@ -8,7 +8,7 @@
     const fs = Math.max(9, Math.min(11, 76 / w)), sx = Math.min(1, 76 / (w * fs));
     return ' style="font-size:' + fs.toFixed(1) + 'px' + (sx < 0.99 ? ';--sx:' + sx.toFixed(3) : '') + '"';
   }
-  const VERSION = "1.11.2";
+  const VERSION = "1.11.3";
   // 記録はプロフィールごとに分けて保存：ゲスト＝"hoshigakuen"、アカウント＝"hoshigakuen:u:<uid>"（ログアウトで消す）
   const GUEST_KEY = "hoshigakuen";
   let KEY = GUEST_KEY;

@@ -103,7 +103,7 @@ try:
         seed()
         dismiss()
         ver = E("HM_APP.version")
-        ok("VERSION が 1.11.2", ver == "1.11.2", ver)
+        ok("VERSION が 1.11.3", ver == "1.11.3", ver)
         ok("ガチャ回数が残っている（再現用）", E("HM_APP.pullsLeft()") >= 1, E("HM_APP.pullsLeft()"))
         ok("ホームにテスト入口がある", pg.locator('[data-act="mode-kj"]').count() == 1 and pg.locator('[data-act="mode-color"]').count() == 1 and pg.locator('[data-act="mode-exam"]').count() == 1)
 
