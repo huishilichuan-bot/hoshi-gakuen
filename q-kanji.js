@@ -9,7 +9,7 @@
   for (const g in HM.KANJI) {
     ENT[g] = HM.KANJI[g].split("|").map((e) => {
       const [head, ws] = e.split("=");
-      const k = head[0], sc = +head.slice(1);
+      const hc = Array.from(head), k = hc[0], sc = +hc.slice(1).join(""); // 𠮟 のように 2 つ分の文字もあるので Array.from で 1 字ずつ分ける
       KG[k] = +g;
       return { k, sc, words: ws.split(";").map((w) => { const [t, r, i, f] = w.split("/"); return { t, r, i: +i, f: f.split(".").map((x) => x.split(":")) }; }) };
     });
@@ -29,12 +29,21 @@
     return { t: "kanji", mode, g, a: e.k, kj: e.k, sc: e.sc, q: wordHtml(w, g, mode) + '<span class="kj-sub">' + sub + "（" + e.sc + "画）</span>", ex: "「" + w.t + "（" + w.r + "）」の「" + e.k + "」は " + e.sc + " 画。「✍️ 書き順」でいつでもお手本が見られるよ。" };
   }
   const CH = 8, PER_UNIT = 40;
+  // v1.7.3 で中学の漢字を 370 字ずつにそろえた。足した字は各学年の最後にあるので、前からの単元の分け方（学習の記録）はそのまま
+  const LEGACY = { 7: 362, 8: 356, 9: 288 };
+  HM.KANJI_LEGACY = LEGACY;
+  const CIRC = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮";
   for (const g in ENT) {
-    const list = ENT[g], units = [];
-    // 単元の大きさをそろえる（最後の単元が少なすぎないように）
-    const nU = Math.ceil(list.length / PER_UNIT), SZ = Math.ceil(list.length / nU);
-    for (let u0 = 0, un = 1; u0 < list.length; u0 += SZ, un++) {
-      const part = list.slice(u0, u0 + SZ), steps = [];
+    const list = ENT[g], units = [], parts = [];
+    const cut = LEGACY[g] && LEGACY[g] < list.length ? LEGACY[g] : list.length;
+    [list.slice(0, cut), list.slice(cut)].forEach((seg) => {
+      if (!seg.length) return;
+      // 単元の大きさをそろえる（最後の単元が少なすぎないように）
+      const nU = Math.ceil(seg.length / PER_UNIT), SZ = Math.ceil(seg.length / nU);
+      for (let u0 = 0; u0 < seg.length; u0 += SZ) parts.push(seg.slice(u0, u0 + SZ));
+    });
+    parts.forEach((part, pi) => {
+      const un = pi + 1, steps = [];
       for (let c0 = 0, cn = 1; c0 < part.length; c0 += CH, cn++) {
         const ch = part.slice(c0, c0 + CH), lab = ch.map((e) => e.k).join("");
         steps.push(["なぞる「" + lab + "」", ch.map((e) => mk(e, e.words[0], +g, "trace")), ch.length]);
@@ -43,12 +52,12 @@
       }
       // まとめ：ほかのことばでも書く（同じ字が続かないように）
       const pool = []; part.forEach((e) => e.words.forEach((w, wi) => pool.push([e, w, wi])));
-      steps.push(["まとめ（ほかのことばで）", (d) => { const sel = pool.filter((p) => (d < 0.5 ? p[2] === 0 : p[2] > 0) || pool.length < 12); const p = sel[Math.floor(HM.U.rng() * sel.length)] || pool[0]; return mk(p[0], p[1], +g, "write"); }, 10]);
-      const n = Math.ceil(list.length / PER_UNIT) > 1 ? "漢字を書こう " + "①②③④⑤⑥⑦⑧⑨⑩"[un - 1] : "漢字を書こう";
+      steps.push(["まとめ（ほかのことばで）", (d) => { const sel = pool.filter((p) => (d < 0.5 ? p[2] === 0 : p[2] > 0) || pool.length < 12); const p = sel[Math.floor(HM.U.rng() * sel.length)] || pool[0]; return mk(p[0], p[1], +g, "write"); }, 10])
+      const n = parts.length > 1 ? "漢字を書こう " + CIRC[un - 1] : "漢字を書こう";
       const unit = HM.unit(n, steps); unit.kanji = true;
       unit.steps.forEach((s) => { if (/^書く/.test(s.n)) s.shuffle = true; });
       units.push(unit);
-    }
+    });
     const subj = (HM.SUBJECTS.ja = HM.SUBJECTS.ja || {});
     subj[g] = units.concat(subj[g] || []);
   }

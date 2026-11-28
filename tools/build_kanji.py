@@ -89,13 +89,18 @@ def align(t, r):
     if not m: return None
     return [[p, m.group(i + 1) if re.match(r"[\u4e00-\u9fff]", p) else ""] for i, p in enumerate(parts)]
 MAN = {}
+NEW = set()
 WARN = []
 for line in open(os.path.join(ROOT, "tools", "kanji_manual.txt"), encoding="utf-8"):
     if not line.strip() or line.startswith("#"): continue
     g, rest = line.split(" ", 1)
+    add = g.startswith("+"); g = g.lstrip("+")   # + は、あとから足した字（各学年の最後に並べる。今までの単元の分け方を変えないため）
     for it in rest.split():
-        k, t, r = it.split(":")
-        f = align(t, r)
+        parts = it.split(":")
+        k, t, r = parts[:3]
+        if add: NEW.add(k)
+        if len(parts) > 3: f = [[s.split(",")[0], s.split(",")[1]] for s in parts[3].split(".")]   # ふりがなを手で指定（字,よみ.字,よみ）
+        else: f = align(t, r)
         if not f: WARN.append(("align", t, r)); continue
         i = [j for j, x in enumerate(f) if x[0] == k]
         if not i: WARN.append(("target", k, t)); continue
@@ -120,7 +125,7 @@ os.makedirs(f"{ROOT}/kanji", exist_ok=True)
 byG = defaultdict(list)
 for k, v in info.items():
     if k in out: byG[v["G"]].append(k)
-for G in byG: byG[G].sort(key=lambda k: (info[k]["freq"], k))
+for G in byG: byG[G].sort(key=lambda k: (k in NEW, info[k]["freq"], k))
 lines = ["// 漢字の書き取り：学年ごとの漢字と例のことば（自動生成：tools/build_kanji.py）",
          "// 出典：KANJIDIC2・JMdict（© EDRDG, CC BY-SA 4.0）、JmdictFurigana（CC BY-SA 4.0）。この表も CC BY-SA 4.0。",
          "(function (root) {", "  const HM = root.HM;", "  HM.KANJI = {"]

@@ -69,6 +69,15 @@
     }
     return out;
   }
+  // 漢字テストの学期・回ごとの記録："学年|学期|回" か "M" ごとに、ベストは大きい方、前回は新しい方
+  function mergeKjTerm(a, b) {
+    const out = {};
+    for (const k of new Set([...Object.keys(obj(a)), ...Object.keys(obj(b))])) {
+      const x = obj(obj(a)[k]), y = obj(obj(b)[k]), nx = num(x.t) >= num(y.t) ? x : y;
+      out[k] = { best: max(x.best, y.best), last: nx.last, ok: nx.ok, t: max(x.t, y.t), n: nx.n };
+    }
+    return out;
+  }
   function mergeTests(a, b) {
     const m = new Map();
     for (const it of [...arr(a), ...arr(b)]) {
@@ -110,7 +119,7 @@
   // まだ何もしていない端末（はじめて開いただけ）の記録か
   function isBlank(st) {
     const days = Object.values(obj(st.days));
-    return !num(obj(obj(st.gk).coins).e) && !obj(st.gk).partner && !num(st.totalStars) && !num(st.pullsUsed) && !Object.keys(obj(st.progress)).length && !arr(st.wrongBox).length && !num(st.bestCombo) && !Object.keys(obj(st.chars)).some((k) => k !== "mori") && !Object.keys(obj(st.bossWins)).length && days.every((d) => !Object.keys(obj(d.steps)).length) && !(obj(st.settings).nick) && !arr(st.tests).length && !Object.keys(obj(st.colorTests)).length && !arr(st.kjWrong).length;
+    return !num(obj(obj(st.gk).coins).e) && !obj(st.gk).partner && !num(st.totalStars) && !num(st.pullsUsed) && !Object.keys(obj(st.progress)).length && !arr(st.wrongBox).length && !num(st.bestCombo) && !Object.keys(obj(st.chars)).some((k) => k !== "mori") && !Object.keys(obj(st.bossWins)).length && days.every((d) => !Object.keys(obj(d.steps)).length) && !(obj(st.settings).nick) && !arr(st.tests).length && !Object.keys(obj(st.colorTests)).length && !arr(st.kjWrong).length && !Object.keys(obj(st.kjTerm)).length;
   }
   // 設定は新しい方を使い、空の項目（名前など）はもう一方でうめる
   function fillSettings(newer, older) {
@@ -155,6 +164,7 @@
     out.colorTests = mergeColorTests(L.colorTests, C.colorTests);
     out.colorCoin = Object.assign({}, obj(L.colorCoin), obj(C.colorCoin));
     out.kjBest = mergeKjBest(L.kjBest, C.kjBest);
+    out.kjTerm = mergeKjTerm(L.kjTerm, C.kjTerm);
     out.kjCoin = Object.assign({}, obj(L.kjCoin), obj(C.kjCoin));
     out.kjWrong = unionBy(L.kjWrong, C.kjWrong, (x) => x && (x.g + "|" + x.k + "|" + x.kind), 150);
     out.lastActive = max(L.lastActive, C.lastActive);

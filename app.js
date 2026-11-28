@@ -1,7 +1,7 @@
 /* ほしの学園 — 勉強して⭐を集める学習アプリ（小1〜中3）。課金・お金の機能はありません。 */
 (() => {
   "use strict";
-  const VERSION = "1.7.2";
+  const VERSION = "1.7.3";
   // 記録はプロフィールごとに分けて保存：ゲスト＝"hoshigakuen"、アカウント＝"hoshigakuen:u:<uid>"（ログアウトで消す）
   const GUEST_KEY = "hoshigakuen";
   let KEY = GUEST_KEY;
@@ -77,7 +77,7 @@
   function fresh() {
     return { schema: SCHEMA, created: now(), settings: { sound: true, haptic: true, nick: "", vol: 0.8, bgm: true, bgmVol: 0.5, remind: false, remindAt: "17:00", fs: "m", rmotion: false, grade: 0, hint: true }, days: {}, totalStars: 0, pulls: 0, pullsUsed: 0,
       chars: { mori: { n: 1, shards: 0, star: 0, t: now() } }, partner: "mori", look: { bg: "note", maru: "red", title: "first" },
-      progress: {}, last: null, reports: [], gachaLog: [], games: {}, wrongBox: [], boxGone: {}, bossWins: {}, boxCleared: 0, bestCombo: 0, use: {}, gk: {}, tests: [], colorTests: {}, colorCoin: {}, kjWrong: [], kjBest: {}, kjCoin: {}, examHist: [], examCoin: {} };
+      progress: {}, last: null, reports: [], gachaLog: [], games: {}, wrongBox: [], boxGone: {}, bossWins: {}, boxCleared: 0, bestCombo: 0, use: {}, gk: {}, tests: [], colorTests: {}, colorCoin: {}, kjWrong: [], kjBest: {}, kjTerm: {}, kjCoin: {}, examHist: [], examCoin: {} };
   }
   function migrate(s) {
     if (!s || typeof s !== "object") return fresh();
@@ -86,6 +86,7 @@
     s.settings = Object.assign(f.settings, s.settings || {});
     s.look = Object.assign(f.look, s.look || {});
     if (!s.chars.mori) s.chars.mori = f.chars.mori;
+    if (!s.kjTerm || typeof s.kjTerm !== "object" || Array.isArray(s.kjTerm)) s.kjTerm = {};
     s.schema = SCHEMA;
     return s;
   }
@@ -516,7 +517,7 @@
     if (top.v === "test-one") return { title: "テスト対策", html: viewTestOne(top.id) };
     if (top.v === "marks") return { title: "単元のようす", html: viewMarks() };
     if (top.v === "color") return { title: "カラーテスト", html: viewColorHome() };
-    if (top.v === "kj") return { title: "漢字50問", html: viewKjHome() };
+    if (top.v === "kj") return { title: "漢字テスト", html: viewKjHome() };
     if (top.v === "exam") return { title: "定期テスト", html: viewExamHome() };
     if (top.v === "exam-scope") return { title: "範囲とタイマー", html: viewExamScope() };
     if (top.v === "exam-hist") return { title: "履歴と点数の推移", html: viewExamHist() };
@@ -1088,8 +1089,7 @@
 
   // ---------- v1.4.0 カラーテスト・漢字50問 ----------
   const CT_OMOTE_N = 10, CT_URA_N = 5, CT_OMOTE_PT = 5, CT_URA_PT = 10; // 10*5 + 5*10 = 100
-  const KJ_TEST_N = 50, KJ_READ_N = 25, KJ_WRITE_N = 25, KJ_PT = 2; // 50*2 = 100
-  const KJ_PRACTICE_N = 10;
+    const KJ_PRACTICE_N = 10;
   let CT = null, KJ = null;
   function drillPartner() {
     return GCArt.charById(state.partner) || GCArt.charById((state.gk && state.gk.partner) || "") || { id: "ren", rarity: 0 };
@@ -1300,7 +1300,10 @@
   }
 
   // ---- 漢字 ----
-  function kjGrade() { const g = prepGrade(); return g >= 7 && g <= 9 ? g : 7; }
+  function kjGrade() { const g = prepGrade(); return g >= 1 && g <= 9 ? g : 7; }
+  const kjGName = (g) => (g === "M" ? "中学のまとめ" : gradeName(+g));
+  function kjTermRec(key) { const all = (state.kjTerm = state.kjTerm && typeof state.kjTerm === "object" ? state.kjTerm : {}); return all[key] || null; }
+  function kjBestAny(g) { let b = null; Object.keys(state.kjTerm || {}).forEach((k) => { if (k === String(g) || k.indexOf(g + "|") === 0) { const r = state.kjTerm[k]; if (r && (b == null || r.best > b)) b = r.best; } }); return b; }
   function kjList(g) { return (HM.KANJI_ENT && HM.KANJI_ENT[g]) || []; }
   function kjWrongArr() { if (!Array.isArray(state.kjWrong)) state.kjWrong = []; return state.kjWrong; }
   function kjBestOf(g) { const all = (state.kjBest = state.kjBest && typeof state.kjBest === "object" ? state.kjBest : {}); return all[String(g)] || null; }
@@ -1350,20 +1353,32 @@
     return HM.U.shuf(Array.from(new Set(opts))).slice(0, 4);
   }
   function viewKjHome() {
-    const top = modeNav[modeNav.length - 1] || {};
-    const g = top.g || kjGrade();
-    const n = kjList(g).length, best = kjBestOf(g), wrong = kjWrongArr().filter((x) => x.g === g).length;
-    let h = '<p class="lead">中学の常用漢字。「読み 25 問 ＋ 書き 25 問」の 50 問テストは 100 点満点（1問 2 点）。</p>';
-    h += '<div class="chips wrap">' + [7, 8, 9].map((x) => '<button type="button" class="chip' + (x === g ? " on" : "") + '" data-act="kj-g" data-g="' + x + '">' + gradeName(x) + "</button>").join("") + "</div>";
-    h += '<div class="kj-hero-card"><div class="kj-hk">' + gradeName(g) + "の漢字</div><b>" + n + " 字</b><small>常用漢字を学年別に分けたもの</small>";
-    if (best) h += '<div class="kj-best">50問のベスト　' + best.score + " / 100 点 " + markIcon(markOf(best.score)) + "</div>";
-    h += "</div>";
-    h += '<div class="drill-acts">';
-    h += '<button type="button" class="btn primary block" data-act="kj-start" data-mode="test50" data-g="' + g + '">📝 50問テスト（読み25・書き25・100点）</button>';
-    h += '<button type="button" class="btn block" data-act="kj-start" data-mode="read" data-g="' + g + '">📖 読みの練習（10問）</button>';
-    h += '<button type="button" class="btn block" data-act="kj-start" data-mode="write" data-g="' + g + '">✍️ 書きの練習（10問）</button>';
-    if (wrong) h += '<button type="button" class="btn block" data-act="kj-start" data-mode="retry" data-g="' + g + '">🔁 まちがえた漢字のやり直し（' + wrong + "）</button>";
-    h += "</div>";
+    const K = HM.KJT, top = modeNav[modeNav.length - 1] || {};
+    let g = top.g || kjGrade(); if (g !== "M") g = +g;
+    let h = '<p class="lead">学年・学期・回をえらんでテスト。同じ回は、いつも同じ問題だよ。</p>';
+    h += '<div class="chips wrap">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map((x) => '<button type="button" class="chip' + (x === g ? " on" : "") + '" data-act="kj-g" data-g="' + x + '">' + gradeName(x) + "</button>").join("") + '<button type="button" class="chip' + (g === "M" ? " on" : "") + '" data-act="kj-g" data-g="M">まとめ</button></div>';
+    const rowBtn = (key, title, sub) => {
+      const rec = kjTermRec(key), m = rec ? markOf(rec.best) : "";
+      return '<button type="button" class="row-btn unit-row kj-round" data-act="kj-round" data-key="' + key + '"><span class="grow"><b>' + esc(title) + '</b><span class="small muted">' + esc(sub) + (rec ? " ・ ベスト " + rec.best + "点" + (rec.last != null && rec.last !== rec.best ? "（前回 " + rec.last + "点 " + markIcon(markOf(rec.last)) + "）" : "") : "") + "</span></span>" + (rec ? '<span class="umark ' + m + '">' + markIcon(m) + " " + rec.best + "点</span>" : '<span class="umark none">まだ</span>') + "</button>";
+    };
+    if (!K || !HM.KANJI_ENT) return h + '<p class="lead soft">漢字のデータがまだ読み込めていないよ。</p>';
+    if (g === "M") {
+      h += '<div class="kj-hero-card"><div class="kj-hk">中学のまとめ</div><b>70 問</b><small>中1〜中3のぜんぶの漢字から、まんべんなく 70 字。書き 56 問 → 読み 14 問。100点に換算するよ。</small></div>';
+      h += '<div class="list">' + rowBtn("M", "中学のまとめテスト", "70問・中1〜中3の範囲") + "</div>";
+    } else {
+      const sp = K.spec(g), n = kjList(g).length, plan = K.plan(g);
+      h += '<div class="kj-hero-card"><div class="kj-hk">' + gradeName(g) + "の漢字</div><b>" + n + " 字・" + plan.length + " 回</b><small>1回 " + sp.total + " 問：書き " + sp.write + " 問 → 読み " + sp.read + " 問" + (g >= 7 ? "（100点に換算）" : "（各 2 点・100点満点）") + "</small></div>";
+      [1, 2, 3].forEach((tm) => {
+        const rs = plan.filter((r) => r.t === tm); if (!rs.length) return;
+        h += '<div class="sec2">' + tm + "学期</div><div class=\"list\">" + rs.map((r) => rowBtn(r.key, "第" + r.n + "回", "範囲 " + r.count + "字 ・ " + sp.total + "問")).join("") + "</div>";
+      });
+      const wrong = kjWrongArr().filter((x) => x.g === g).length;
+      h += '<div class="sec2">れんしゅう</div><div class="drill-acts">';
+      h += '<button type="button" class="btn block" data-act="kj-start" data-mode="read" data-g="' + g + '">📖 読みの練習（10問）</button>';
+      h += '<button type="button" class="btn block" data-act="kj-start" data-mode="write" data-g="' + g + '">✍️ 書きの練習（10問）</button>';
+      if (wrong) h += '<button type="button" class="btn block" data-act="kj-start" data-mode="retry" data-g="' + g + '">🔁 まちがえた漢字のやり直し（' + wrong + "）</button>";
+      h += "</div>";
+    }
     h += '<p class="small muted">書きは指で書いて、答えを見て自分で ⭕❌ をつけるよ。読みは 4 つのなかからえらぶよ。</p>';
     return h;
   }
@@ -1371,36 +1386,50 @@
     g = +g;
     const kind = mode === "read" || mode === "write" ? mode : null;
     const prefer = mode === "retry";
-    let n = mode === "test50" ? KJ_TEST_N : KJ_PRACTICE_N;
+    const n = KJ_PRACTICE_N;
     let qs;
-    if (mode === "test50") {
-      const r = pickKjQs(g, "read", KJ_READ_N, false);
-      const w = pickKjQs(g, "write", KJ_WRITE_N, false).filter((q) => !r.some((x) => x.k === q.k));
-      // fill write if filter shrunk it
-      if (w.length < KJ_WRITE_N) pickKjQs(g, "write", KJ_WRITE_N * 2, false).forEach((q) => { if (w.length < KJ_WRITE_N && !w.some((x) => x.k === q.k)) w.push(q); });
-      qs = r.slice(0, KJ_READ_N).concat(w.slice(0, KJ_WRITE_N));
-      // if still short, allow overlap
-      if (qs.length < KJ_TEST_N) qs = pickKjQs(g, "read", KJ_READ_N, false).concat(pickKjQs(g, "write", KJ_WRITE_N, false)).slice(0, KJ_TEST_N);
-    } else if (mode === "retry") {
+    if (mode === "retry") {
       qs = pickKjQs(g, null, Math.min(20, Math.max(1, kjWrongArr().filter((x) => x.g === g).length || 10)), true);
       if (!qs.length) { toast("やり直しリストはからっぽだよ"); return; }
     } else qs = pickKjQs(g, kind, n, false);
     if (!qs.length) { toast("この学年の漢字データがないよ"); return; }
-    qs.forEach((q) => { if (q.kind === "read") q.opts = kjReadOpts(q, g); q.pts = mode === "test50" ? KJ_PT : 10; });
-    // practice 10問 = 各10点で100点、テスト50問 = 各2点で100点
-    if (mode !== "test50") { const pt = Math.round(100 / qs.length); qs.forEach((q, i) => { q.pts = i === qs.length - 1 ? 100 - pt * (qs.length - 1) : pt; }); }
+    qs.forEach((q) => { if (q.kind === "read") q.opts = kjReadOpts(q, g); });
+    // れんしゅう：1問 10 点（10問で100点）
+    const pt = Math.round(100 / qs.length); qs.forEach((q, i) => { q.pts = i === qs.length - 1 ? 100 - pt * (qs.length - 1) : pt; });
     KJ = { mode, g, qs, i: 0, results: [], revealed: false, self: null, score: 0, coins: 0 };
     Q = { mode: "kj50", s: "ja", g, ui: null, backNav: [{ v: "kj", g }] };
     $("#quiz").hidden = false; document.body.classList.add("in-quiz");
-    if (mode === "test50") renderKjCover(); else renderKjQ();
+    renderKjQ();
+  }
+  // 学期・回のテスト（key は "学年|学期|回" か、まとめの "M"）。問題はいつも同じ
+  function startKjRound(key) {
+    const K = HM.KJT; if (!K || !HM.KANJI_ENT) { toast("漢字のデータが読み込めていないよ"); return; }
+    let g = "M", idx = 0, label = "中学のまとめ", range = 70;
+    if (key !== "M") {
+      const [gg, tm, nn] = String(key).split("|").map(Number), plan = K.plan(gg);
+      idx = plan.findIndex((r) => r.t === tm && r.n === nn);
+      if (idx < 0) { toast("この回が見つからないよ"); return; }
+      g = gg; label = plan[idx].label; range = plan[idx].count;
+    }
+    const qs = K.questions(g, idx), mid = K.isMid(g);
+    if (!qs.length) { toast("この回の問題がまだないよ"); return; }
+    qs.forEach((q) => { q.pts = mid ? 0 : 100 / qs.length; });
+    KJ = { mode: "round", key, g, label, range, mid, qs, i: 0, results: [], revealed: false, self: null, score: 0, coins: 0 };
+    Q = { mode: "kj50", s: "ja", g: g === "M" ? 7 : g, ui: null, backNav: [{ v: "kj", g }] };
+    $("#quiz").hidden = false; document.body.classList.add("in-quiz");
+    renderKjCover();
   }
   function renderKjCover() {
-    const kj = KJ, p = drillPartner();
-    let h = '<div class="kj-cover"><div class="ct-seal">ほしの学園</div><div class="ct-kicker">漢字 50 問テスト</div>';
-    h += "<h2>" + gradeName(kj.g) + "</h2>";
-    h += '<div class="ct-pts"><b>100 点満点</b><span>読み 25 問（各 2 点）＝ 50 点</span><span>書き 25 問（各 2 点）＝ 50 点</span><span>全 ' + kj.qs.length + " 問</span></div>";
-    h += '<p class="small">書きは指で書いたあと、答えを見て自分で ⭕❌ をつけるよ。</p>';
-    h += '<div class="sum-char">' + charHtml(p.id, 100, "bob r" + p.rarity) + '<div class="bubble">50 問、いってみよう！</div></div>';
+    const kj = KJ, p = drillPartner(), n = kj.qs.length;
+    const w = kj.qs.filter((q) => q.kind === "write").length, r = n - w;
+    let h = '<div class="kj-cover"><div class="ct-seal">ほしの学園</div><div class="ct-kicker">漢字テスト</div>';
+    h += "<h2>" + esc(kjGName(kj.g)) + (kj.g === "M" ? "" : "　" + esc(kj.label)) + "</h2>";
+    h += '<div class="ct-pts"><b>100 点満点</b>';
+    if (kj.mid) h += "<span>書き " + w + " 問 → 読み " + r + " 問（全 " + n + " 問）</span><span>100点に換算（1問 約 1.4 点）</span>";
+    else h += "<span>書き " + w + " 問（各 2 点）＝ " + w * 2 + " 点</span><span>読み " + r + " 問（各 2 点）＝ " + r * 2 + " 点</span><span>全 " + n + " 問</span>";
+    h += "</div>";
+    h += '<p class="small">' + (kj.g === "M" ? "中1〜中3の漢字からまんべんなく出るよ。" : "この回の範囲は " + kj.range + " 字。出る漢字はいつも同じだよ。") + "書きは指で書いたあと、答えを見て自分で ⭕❌ をつけるよ。</p>";
+    h += '<div class="sum-char">' + charHtml(p.id, 100, "bob r" + p.rarity) + '<div class="bubble">' + n + " 問、いってみよう！</div></div>";
     h += '<div class="sum-act"><button type="button" class="btn primary block" data-kj="go">はじめる</button><button type="button" class="btn ghost block" data-q="quit">もどる</button></div></div>';
     $("#quiz").innerHTML = h; $("#quiz").scrollTop = 0;
   }
@@ -1408,7 +1437,7 @@
     const kj = KJ, q = kj.qs[kj.i], n = kj.qs.length;
     let h = '<div class="kj50"><div class="ct-bar"><button type="button" class="ct-x" data-q="quit" aria-label="やめる">✕</button><div class="qz-prog"><i style="width:' + Math.round((kj.i / n) * 100) + '%"></i></div><span class="qz-n num">' + (kj.i + 1) + "/" + n + "</span></div>";
     h += '<div class="kj50-body">';
-    h += '<div class="kj50-kind">' + (q.kind === "read" ? "読み" : "書き") + "　" + q.pts + "点</div>";
+    h += '<div class="kj50-kind">' + (q.kind === "read" ? "読み" : "書き") + "　" + (kj.mode === "round" ? (kj.mid ? "約1.4点" : "2点") : q.pts + "点") + "</div>";
     if (q.kind === "read") {
       h += '<p class="kj50-q">このことばの読みはどれ？</p>';
       h += '<div class="kj50-word">' + esc(q.w.t) + "</div>";
@@ -1495,20 +1524,21 @@
     else renderKjQ();
   }
   function renderKjResult() {
-    const kj = KJ, max = 100, pct = kj.score, mark = markOf(pct);
+    const kj = KJ, max = 100, okN = kj.results.filter((r) => r.ok).length;
+    if (kj.mode === "round") kj.score = HM.KJT.score(okN, kj.qs.length); // 100点への換算（四捨五入）
+    const pct = kj.score, mark = markOf(pct);
     const readQs = kj.qs.filter((q) => q.kind === "read"), writeQs = kj.qs.filter((q) => q.kind === "write");
     const readOk = kj.results.filter((r) => r.q.kind === "read" && r.ok).length;
     const writeOk = kj.results.filter((r) => r.q.kind === "write" && r.ok).length;
     const p = drillPartner();
-    const title = kj.mode === "test50" ? "漢字 50 問テスト" : kj.mode === "retry" ? "やり直し" : (kj.mode === "read" ? "読みの練習" : "書きの練習");
-    if (kj.mode === "test50") {
-      const all = (state.kjBest = state.kjBest || {});
-      const prev = all[String(kj.g)] || { best: 0 };
-      all[String(kj.g)] = { best: Math.max(prev.best || 0, kj.score), last: kj.score, t: now(), n: kj.qs.length };
+    const title = kj.mode === "round" ? "漢字テスト　" + kj.label : kj.mode === "retry" ? "やり直し" : (kj.mode === "read" ? "読みの練習" : "書きの練習");
+    if (kj.mode === "round") {
+      const all = (state.kjTerm = state.kjTerm && typeof state.kjTerm === "object" ? state.kjTerm : {});
+      const prev = all[kj.key] || { best: 0 };
+      all[kj.key] = { best: Math.max(prev.best || 0, kj.score), last: kj.score, ok: okN, n: kj.qs.length, t: now() };
     }
     const ck = (state.kjCoin = state.kjCoin || {});
-    const dayK = kj.g + "|" + kj.mode + "|" + today();
-    const okN = kj.results.filter((r) => r.ok).length;
+    const dayK = kj.g + "|" + (kj.mode === "round" ? "test50" : kj.mode) + "|" + today();
     let coins = 0;
     if (!ck[dayK] && okN) { ck[dayK] = 1; coins = grantQuiet(okN); }
     kj.coins = coins;
@@ -1516,11 +1546,12 @@
     const line = pct >= 90 ? "花丸！ この調子だよ！" : pct >= 60 ? "いい感じ！ まちがえた字はやり直しリストに入っているよ。" : "だいじょうぶ。やり直しリストから、もう一度書いてみよう！";
     let h = '<div class="ct-result kj-result">';
     if (pct >= 90) h += '<div class="ct-hana' + (pct >= 100 ? " perfect" : "") + '"><span>花丸</span></div>';
-    h += '<div class="ct-score-hero"><div class="ct-sh-k">' + esc(title) + "　" + gradeName(kj.g) + '</div><div class="ct-sh-n"><b>' + kj.score + "</b><small> / " + max + " 点</small></div>" + markLabel(mark, pct) + "</div>";
+    h += '<div class="ct-score-hero"><div class="ct-sh-k">' + esc(title) + "　" + esc(kjGName(kj.g)) + '</div><div class="ct-sh-n"><b>' + kj.score + "</b><small> / " + max + " 点</small></div>" + markLabel(mark, pct) + "</div>";
     h += '<div class="ct-break">';
     if (readQs.length) h += "<div><b>読み</b><span>" + readOk + " / " + readQs.length + " 問</span></div>";
     if (writeQs.length) h += "<div><b>書き</b><span>" + writeOk + " / " + writeQs.length + " 問</span></div>";
     h += "<div><b>正解</b><span>" + okN + " / " + kj.qs.length + " 問</span></div></div>";
+    if (kj.mode === "round" && kj.mid) h += '<p class="small muted center">' + okN + " / " + kj.qs.length + " 問 ＝ 100点に換算して " + kj.score + " 点（正解数 ÷ 問題数 × 100、四捨五入）</p>";
     if (coins) h += '<p class="ct-coin">🪙 +' + coins + " コイン（今日このメニューの1回目）</p>";
     h += '<div class="sum-char">' + charHtml(p.id, 100, "bob r" + p.rarity) + '<div class="bubble">' + esc(line) + "</div></div>";
     h += '<div class="sum-act"><button type="button" class="btn primary block" data-kj="again">もう一度</button><button type="button" class="btn ghost block" data-q="quit">もどる</button></div>';
@@ -1549,7 +1580,7 @@
     }
     if (act === "undo") { if (KJ._pad) KJ._pad.undo(); return true; }
     if (act === "clear") { if (KJ._pad) KJ._pad.clear(); return true; }
-    if (act === "again") { startKj(KJ.mode, KJ.g); return true; }
+    if (act === "again") { if (KJ.mode === "round") startKjRound(KJ.key); else startKj(KJ.mode, KJ.g); return true; }
     return false;
   }
 
@@ -1560,14 +1591,14 @@
     return "中学の単元　100点満点";
   }
   function kjCardSub() {
-    const g = kjGrade(), b = kjBestOf(g);
-    return b ? gradeName(g) + " ベスト " + b.best + "点" : gradeName(g) + "　読みと書き　50問";
+    const g = kjGrade(), b = kjBestAny(g);
+    return b != null ? gradeName(g) + " ベスト " + b + "点" : gradeName(g) + "　学期ごとのテスト";
   }
   function homeDrillHtml() {
     return '<button type="button" class="drill-card exam" data-act="mode-exam"><span class="mc-ico">📝</span><b>定期テスト</b><small>' + esc(examCardSub()) + "</small></button>" +
       '<div class="drill2">' +
       '<button type="button" class="drill-card color" data-act="mode-color"><span class="mc-ico">🖍️</span><b>カラーテスト</b><small>' + esc(colorCardSub()) + "</small></button>" +
-      '<button type="button" class="drill-card kj" data-act="mode-kj"><span class="mc-ico">🈶</span><b>漢字50問</b><small>' + esc(kjCardSub()) + "</small></button>" +
+      '<button type="button" class="drill-card kj" data-act="mode-kj"><span class="mc-ico">🈶</span><b>漢字テスト</b><small>' + esc(kjCardSub()) + "</small></button>" +
       "</div>";
   }
 
@@ -2636,7 +2667,8 @@
       else if (a === "ct-g") { const cur = modeNav[modeNav.length - 1]; if (cur && cur.v === "color") { cur.g = +ac.dataset.g; const gs = gradesOf(cur.s || "math"); if (!gs.includes(cur.g)) { const f = SUBJ.find((x) => x.id !== "life" && gradesOf(x.id).includes(cur.g)); if (f) cur.s = f.id; } render(); } }
       else if (a === "ct-s") { const cur = modeNav[modeNav.length - 1]; if (cur && cur.v === "color") { cur.s = ac.dataset.s; render(); } }
       else if (a === "ct-start") { startColorTest(ac.dataset.s, +ac.dataset.g, +ac.dataset.ui); }
-      else if (a === "kj-g") { const cur = modeNav[modeNav.length - 1]; if (cur && cur.v === "kj") { cur.g = +ac.dataset.g; render(); } }
+      else if (a === "kj-g") { const cur = modeNav[modeNav.length - 1]; if (cur && cur.v === "kj") { cur.g = ac.dataset.g === "M" ? "M" : +ac.dataset.g; render(); } }
+      else if (a === "kj-round") { startKjRound(ac.dataset.key); }
       else if (a === "kj-start") { startKj(ac.dataset.mode, +ac.dataset.g); }
     }
   });

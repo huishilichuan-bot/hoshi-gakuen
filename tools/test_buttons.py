@@ -1,5 +1,5 @@
 # ほしの学園 — 学習・テスト・ゲーム・ガチャの主要ボタンが正しい画面を開くこと
-# （v1.7.2: 学年の data-g がガチャと取り違えられないこと）
+# （v1.7.2: 学年の data-g がガチャと取り違えられないこと／v1.7.3: 漢字テストの学年→学期→回）
 import json, os, subprocess, sys, time
 from playwright.sync_api import sync_playwright
 
@@ -10,7 +10,7 @@ NOAUTH = (
     "try{localStorage.setItem('hoshigakuen-auth-seen','1')}catch(e){}"
 )
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SHOT = os.path.join(ROOT, "screenshots", "v172")
+SHOT = os.path.join(ROOT, "screenshots", "v173")
 os.makedirs(SHOT, exist_ok=True)
 PORT = 8782
 srv = subprocess.Popen(
@@ -103,22 +103,25 @@ try:
         seed()
         dismiss()
         ver = E("HM_APP.version")
-        ok("VERSION が 1.7.2", ver == "1.7.2", ver)
+        ok("VERSION が 1.7.3", ver == "1.7.3", ver)
         ok("ガチャ回数が残っている（再現用）", E("HM_APP.pullsLeft()") >= 1, E("HM_APP.pullsLeft()"))
         ok("ホームにテスト入口がある", pg.locator('[data-act="mode-kj"]').count() == 1 and pg.locator('[data-act="mode-color"]').count() == 1 and pg.locator('[data-act="mode-exam"]').count() == 1)
 
-        # ---- 漢字50問 ----
+        # ---- 漢字テスト（学年→学期→回） ----
         tap('[data-act="mode-kj"]')
-        no_gacha("漢字50問の入口")
-        ok("漢字の学年・開始ボタンがある", pg.locator('[data-act="kj-g"]').count() >= 3 and pg.locator('[data-act="kj-start"][data-mode="test50"]').count() == 1)
-        tap('[data-act="kj-g"][data-g="8"]')
+        no_gacha("漢字テストの入口")
+        ok("漢字の学年チップが 小1〜中3 とまとめ", pg.locator('[data-act="kj-g"]').count() == 10 and pg.locator('[data-act="kj-g"][data-g="M"]').count() == 1)
+        ok("中1（6回）の回ボタンが並ぶ", pg.locator('[data-act="kj-round"]').count() == 6 and "1学期" in pg.inner_text("#main") and "3学期" in pg.inner_text("#main"))
+        tap('[data-act="kj-g"][data-g="4"]')
         no_gacha("漢字の学年チップ")
-        ok("学年チップで中2になる", pg.locator('[data-act="kj-g"][data-g="8"].on').count() == 1)
-        tap('[data-act="kj-start"][data-mode="test50"]')
-        no_gacha("漢字50問スタート")
-        cover = pg.locator(".kj-cover").count() == 1 and "漢字 50 問テスト" in pg.inner_text("#quiz")
+        ok("学年チップで小4になる（5回）", pg.locator('[data-act="kj-g"][data-g="4"].on').count() == 1 and pg.locator('[data-act="kj-round"]').count() == 5)
+        tap('[data-act="kj-g"][data-g="8"]')
+        ok("学年チップで中2になる（6回）", pg.locator('[data-act="kj-g"][data-g="8"].on').count() == 1 and pg.locator('[data-act="kj-round"]').count() == 6)
+        tap('[data-act="kj-round"][data-key="8|2|1"]')
+        no_gacha("漢字テスト第1回スタート")
+        cover = pg.locator(".kj-cover").count() == 1 and "漢字テスト" in pg.inner_text("#quiz") and "書き 56 問" in pg.inner_text("#quiz")
         quiz_mode = E("HM_APP.quiz() && HM_APP.quiz().mode")
-        ok("漢字50問の表紙が開く", cover and quiz_mode == "kj50", quiz_mode)
+        ok("漢字テストの表紙が開く", cover and quiz_mode == "kj50", quiz_mode)
         pg.screenshot(path=os.path.join(SHOT, "kanji50.png"))
         pg.screenshot(path="/workspace/hoshigakuen-fix-kanji50.png")
         # 読み・書きの練習ボタンも
