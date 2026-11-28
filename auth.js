@@ -314,7 +314,7 @@ function statusLine() {
   if (S.status === "saved") return '<span class="sy ok">● クラウドに保存ずみ' + (t ? "（" + t + "）" : "") + "</span>";
   if (S.status === "offline") return '<span class="sy off">● オフライン：つながったら自動で保存するよ</span>';
   if (S.status === "error") return '<span class="sy off">● あとでもう一度保存するよ</span>';
-  return '<span class="sy">● 準備中</span>';
+  return '<span class="sy">● クラウドにつないでいるよ…</span>';
 }
 function sectionHtml() {
   if (!ENABLED) return "";

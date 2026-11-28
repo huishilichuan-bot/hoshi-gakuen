@@ -1,5 +1,5 @@
 /* ほしの学園 — 画面のスタイル（明るく、読みやすく） */
-:root { --accent: #2b5fb4; --accent-ink: #fff; --accent-soft: rgba(43,95,180,.1); --gold: #d4a017; --bg: #f4f6fb; --bg2: #e9edf5; --tabh: 64px; }
+:root { --accent: #2b5fb4; --accent-ink: #fff; --accent-soft: rgba(43,95,180,.1); --gold: #d4a017; --bg: #f4f6fb; --bg2: #e9edf5; --tabh: 72px; }
 body { background: var(--bg); }
 body[data-bg="sky"] { background: linear-gradient(180deg, #cfe9ff 0%, #f4f9ff 60%); background-attachment: fixed; }
 body[data-bg="sunset"] { background: linear-gradient(180deg, #ffd3a5 0%, #fd9fa0 35%, #f7f1f4 75%); background-attachment: fixed; }
@@ -145,7 +145,8 @@ body.in-quiz { overflow: hidden; }
 .ai { position: relative; width: 62px; height: 62px; border-radius: 16px; display: grid; place-items: center; font-size: 30px; background: linear-gradient(145deg, color-mix(in srgb, var(--gc) 75%, #fff), var(--gc)); box-shadow: 0 4px 10px rgba(0,0,0,.15), inset 0 1px 0 rgba(255,255,255,.4); }
 .app-ic.locked .ai { filter: grayscale(.85) brightness(.9); }
 .lock { position: absolute; right: -4px; bottom: -4px; font-size: 18px; background: #fff; border-radius: 50%; width: 26px; height: 26px; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,.25); filter: none; }
-.an { font-size: 11px; font-weight: 700; line-height: 1.25; text-align: center; max-width: 76px; }
+.an { font-size: 11px; font-weight: 700; line-height: 1.25; text-align: center; max-width: none; white-space: nowrap; display: inline-block; transform: scaleX(var(--sx, 1)); transform-origin: center top; }
+.an .an-sub { white-space: nowrap; }
 body[data-bg="night"] .an, body[data-bg="aurora"] .an, body[data-bg="cosmos"] .an { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
 .diff-list { display: grid; gap: 8px; margin-top: 12px; }
 /* ガチャ */
@@ -1467,6 +1468,8 @@ html.rmotion .mode-sel, html.rmotion .ms-slot { animation: none; }
 .ex-hero b { display: block; font-size: 22px; font-weight: 900; margin: 4px 0 6px; }
 .ex-hero small { display: block; color: #5c5f77; font-weight: 700; }
 .ex-totals { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 16px; }
+.ex-totals.top { margin: -4px 0 14px; }
+.ex-result .ex-totals { margin-bottom: 18px; }
 .ex-tot { padding: 12px 14px; border-radius: 18px; background: #fff; box-shadow: 0 6px 16px rgba(60,50,140,.08); }
 .ex-tot .k { font-size: 11px; font-weight: 800; color: #7048e8; letter-spacing: .06em; }
 .ex-tot .n { font-size: 22px; font-weight: 900; margin-top: 2px; }

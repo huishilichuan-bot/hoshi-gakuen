@@ -1,13 +1,14 @@
 {
  "seeds": 40,
- "generatedChecked": 1039888,
- "uniqueQuestions": 480480,
+ "generatedChecked": 1211038,
+ "uniqueQuestions": 499904,
  "stats": {
+  "tf": 219236,
+  "tiles": 25280,
+  "odd": 65674,
   "chk": 430095,
   "qx": 65639,
   "ord": 4689,
-  "tf": 179614,
-  "odd": 63206,
   "pairchk": 1658,
   "nl": 4160,
   "multi": 13567,
@@ -17,8 +18,7 @@
   "tap": 6684,
   "sys": 6292,
   "eqn": 3760,
-  "tiles": 21760,
-  "kanji": 40544,
+  "kanji": 38374,
   "en4_tl": 32560,
   "en4_mc": 43775,
   "en4_sp": 32760,
@@ -31,6 +31,126 @@
  },
  "problems": 0,
  "cover": {
+  "tech:7": {
+   "units": 6,
+   "steps": 33,
+   "filled": 33,
+   "gen": 33,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "tech:8": {
+   "units": 6,
+   "steps": 34,
+   "filled": 34,
+   "gen": 34,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "tech:9": {
+   "units": 6,
+   "steps": 36,
+   "filled": 36,
+   "gen": 36,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "home:7": {
+   "units": 6,
+   "steps": 30,
+   "filled": 30,
+   "gen": 30,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "home:8": {
+   "units": 6,
+   "steps": 32,
+   "filled": 32,
+   "gen": 32,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "home:9": {
+   "units": 6,
+   "steps": 34,
+   "filled": 34,
+   "gen": 34,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "music:7": {
+   "units": 6,
+   "steps": 31,
+   "filled": 31,
+   "gen": 31,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "music:8": {
+   "units": 6,
+   "steps": 34,
+   "filled": 34,
+   "gen": 34,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "music:9": {
+   "units": 6,
+   "steps": 35,
+   "filled": 35,
+   "gen": 35,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "art:7": {
+   "units": 6,
+   "steps": 31,
+   "filled": 31,
+   "gen": 31,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "art:8": {
+   "units": 6,
+   "steps": 34,
+   "filled": 34,
+   "gen": 34,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "art:9": {
+   "units": 6,
+   "steps": 36,
+   "filled": 36,
+   "gen": 36,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "pe:7": {
+   "units": 6,
+   "steps": 30,
+   "filled": 30,
+   "gen": 30,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "pe:8": {
+   "units": 6,
+   "steps": 32,
+   "filled": 32,
+   "gen": 32,
+   "bank": 0,
+   "bankQ": 0
+  },
+  "pe:9": {
+   "units": 6,
+   "steps": 35,
+   "filled": 35,
+   "gen": 35,
+   "bank": 0,
+   "bankQ": 0
+  },
   "math:1": {
    "units": 12,
    "steps": 147,
@@ -280,28 +400,28 @@
    "bankQ": 437
   },
   "ja:7": {
-   "units": 16,
-   "steps": 130,
-   "filled": 130,
-   "gen": 28,
-   "bank": 102,
-   "bankQ": 750
+   "units": 17,
+   "steps": 133,
+   "filled": 133,
+   "gen": 29,
+   "bank": 104,
+   "bankQ": 766
   },
   "ja:8": {
-   "units": 14,
-   "steps": 125,
-   "filled": 125,
+   "units": 15,
+   "steps": 129,
+   "filled": 129,
    "gen": 30,
-   "bank": 95,
-   "bankQ": 749
+   "bank": 99,
+   "bankQ": 777
   },
   "ja:9": {
-   "units": 13,
-   "steps": 125,
-   "filled": 125,
-   "gen": 42,
-   "bank": 83,
-   "bankQ": 596
+   "units": 16,
+   "steps": 142,
+   "filled": 142,
+   "gen": 35,
+   "bank": 107,
+   "bankQ": 760
   },
   "en:3": {
    "units": 10,
@@ -375,7 +495,7 @@
    ]
   },
   "short_set": {
-   "n": 1280,
+   "n": 1480,
    "sample": [
     "math 3 / 三角形と角 / 三角形のせいしつ（ぜんぶえらぶ） 2/6",
     "math 3 / 三角形と角 / 三角形のせいしつ（ぜんぶえらぶ） 2/6",

@@ -1,7 +1,14 @@
 /* ほしの学園 — 勉強して⭐を集める学習アプリ（小1〜中3）。課金・お金の機能はありません。 */
 (() => {
   "use strict";
-  const VERSION = "1.7.3";
+  // ゲーム一覧の名前：長い名前も1行に収める（文字を少し小さく・必要なら横を少しつめる）
+  function anFit(n) {
+    let w = 0; for (const ch of String(n || "")) w += /[\u0000-\u00ff\uff61-\uff9f]/.test(ch) ? 0.56 : 1;
+    if (w <= 6.9) return "";
+    const fs = Math.max(9, Math.min(11, 76 / w)), sx = Math.min(1, 76 / (w * fs));
+    return ' style="font-size:' + fs.toFixed(1) + 'px' + (sx < 0.99 ? ';--sx:' + sx.toFixed(3) : '') + '"';
+  }
+  const VERSION = "1.8.0";
   // 記録はプロフィールごとに分けて保存：ゲスト＝"hoshigakuen"、アカウント＝"hoshigakuen:u:<uid>"（ログアウトで消す）
   const GUEST_KEY = "hoshigakuen";
   let KEY = GUEST_KEY;
@@ -759,15 +766,11 @@
     const lab = examLabel(system, kind);
     const tot = HMExam.totals(examHistArr(), g, system, kind);
     let h = '<div class="ex-hero"><div class="eh-k">定期テスト</div><b>' + gradeName(g) + "の" + esc(lab) + "</b><small>実際の中間・期末に近い、100点満点の問題用紙だよ</small></div>";
+    // 5教科・9教科の合計は、タブバーに隠れないように一番上（見出しのすぐ下）に出す
+    if (tot.five.n || tot.nine.n) h += '<div class="ex-totals top">' + examTotBox("5教科", tot.five, 500) + examTotBox("9教科", tot.nine, 900) + "</div>";
     h += '<div class="sec2">学年</div><div class="chips wrap">' + [7, 8, 9].map((x) => '<button type="button" class="chip' + (x === g ? " on" : "") + '" data-act="ex-g" data-g="' + x + '">' + gradeName(x) + "</button>").join("") + "</div>";
     h += '<div class="sec2">学期のしくみ</div><div class="chips wrap"><button type="button" class="chip' + (system === "3" ? " on" : "") + '" data-act="ex-sys" data-sys="3">3学期制</button><button type="button" class="chip' + (system === "2" ? " on" : "") + '" data-act="ex-sys" data-sys="2">前期・後期</button></div>';
     h += '<div class="sec2">テストの種類</div><div class="chips wrap">' + terms.map((t) => '<button type="button" class="chip' + (t.id === kind ? " on" : "") + '" data-act="ex-kind" data-kind="' + t.id + '">' + esc(t.n) + "</button>").join("") + "</div>";
-    if (tot.five.n || tot.nine.n) {
-      h += '<div class="ex-totals">';
-      h += examTotBox("5教科", tot.five, 500);
-      h += examTotBox("9教科", tot.nine, 900);
-      h += "</div>";
-    }
     h += '<div class="sec2">教科をえらぶ</div><div class="list">';
     HMExam.ALL9.forEach((s) => {
       if (!HMExam.offersSubject(system, kind, s)) return;
@@ -2195,7 +2198,7 @@
     const list = all.filter((g) => gameGenre === "all" || genreOf(g) === gameGenre);
     let h = '<div class="gate ' + (open ? "open" : "") + '">' + (open ? "🎮 今日はゲームで遊べるよ！（⭐" + n + "）" : "🔒 今日の⭐が " + STARS_TO_UNLOCK + " こになるとひらきます（今 " + n + " こ）") + "</div>";
     h += '<div class="genre-bar" role="tablist" aria-label="ジャンル">' + GENRES.map(([k, l, e]) => { const c = k === "all" ? all.length : all.filter((g) => genreOf(g) === k).length; return c ? '<button type="button" role="tab" class="genre-chip' + (gameGenre === k ? " on" : "") + '" aria-selected="' + (gameGenre === k) + '" data-genre="' + k + '"><span>' + e + "</span>" + l + "<small>" + c + "</small></button>" : ""; }).join("") + "</div>";
-    h += '<div class="app-grid">' + list.map((g, i) => '<button type="button" class="app-ic ' + (open ? "" : "locked") + '" data-game="' + g.id + '" style="--i:' + (i % 24) + '"><span class="ai">' + HMIcons.icon(g.id, g.c, 62, g.e) + (g.fresh ? '<span class="newb">NEW</span>' : "") + (open ? "" : '<span class="lock">🔒</span>') + "</span><span class=\"an\">" + esc(g.n) + (g.group ? '<small class="an-sub">' + g.members.length + "種目</small>" : "") + "</span></button>").join("") + "</div>";
+    h += '<div class="app-grid">' + list.map((g, i) => '<button type="button" class="app-ic ' + (open ? "" : "locked") + '" data-game="' + g.id + '" style="--i:' + (i % 24) + '"><span class="ai">' + HMIcons.icon(g.id, g.c, 62, g.e) + (g.fresh ? '<span class="newb">NEW</span>' : "") + (open ? "" : '<span class="lock">🔒</span>') + "</span><span class=\"an\"" + anFit(g.n) + ">" + esc(g.n) + (g.group ? '<small class="an-sub">' + g.members.length + "種目</small>" : "") + "</span></button>").join("") + "</div>";
     h += '<p class="foot">全' + all.length + "ゲーム</p>";
     return h;
   }
@@ -2227,7 +2230,7 @@
       if (pack.group) {
         courses = '<div class="ms-courses">' + pack.members.map((m) => '<button type="button" class="ms-course' + (m.id === playId ? " on" : "") + '" data-course="' + m.id + '">' + (m.e || "") + " " + esc(m.n) + "</button>").join("") + "</div>";
       }
-      if (playId === "kart") {
+      if (window.HMRace3d && HMRace3d.hasLaps && HMRace3d.hasLaps(playId)) {
         courses += '<div class="ms-courses ms-laps"><span class="ms-lab">周回</span>' +
           [2, 3].map((n) => '<button type="button" class="ms-course' + (lapsPick === n ? " on" : "") + '" data-laps="' + n + '">' + n + "周</button>").join("") + "</div>";
       }
@@ -2240,7 +2243,7 @@
     el.addEventListener("click", (e) => {
       const c = e.target.closest("[data-course]"); if (c) { sound("tap"); playId = c.dataset.course; paint(); return; }
       const lp = e.target.closest("[data-laps]"); if (lp) { sound("tap"); lapsPick = +lp.dataset.laps === 3 ? 3 : 2; if (window.HMRace3d) HMRace3d.pendingLaps = lapsPick; paint(); return; }
-      const b = e.target.closest("[data-diff]"); if (b) { sound("tap"); if (playId === "kart" && window.HMRace3d) HMRace3d.pendingLaps = lapsPick; closeModeSel(true); startGame(playId, b.dataset.diff); return; }
+      const b = e.target.closest("[data-diff]"); if (b) { sound("tap"); if (window.HMRace3d && HMRace3d.hasLaps && HMRace3d.hasLaps(playId)) HMRace3d.pendingLaps = lapsPick; closeModeSel(true); startGame(playId, b.dataset.diff); return; }
       if (e.target.closest('[data-ms="top"]') || e.target === el) { sound("tap"); closeModeSel(); }
     });
   }

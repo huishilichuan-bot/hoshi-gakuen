@@ -32,7 +32,7 @@
   };
   const ITEM_NAMES = { boost: "ほしダッシュ", ink: "インクしみ", shield: "ノートバリア", star: "ながれぼし" };
   const ITEM_IDS = ["boost", "boost", "ink", "shield", "star"];
-  const DEFAULT_LAPS = 2, RACERS = 8, ROAD_W = 7.2;
+  const DEFAULT_LAPS = 2, RACERS = 8, ROAD_W = 7.2, FIN_T = 0.975;
 
   function loadThree() {
     if (THREE) return Promise.resolve(THREE);
@@ -63,7 +63,7 @@
       P(-38, -8), P(-28, -22, 0.15), P(-14, -30), P(-4, -36)
     ];
   }
-  function makeCurve(T, pts) { return new T.CatmullRomCurve3(pts, true, "catmullrom", 0.18); }
+  function makeCurve(T, pts, closed, smooth) { return smooth ? new T.CatmullRomCurve3(pts, closed !== false, "centripetal", 0.5) : new T.CatmullRomCurve3(pts, closed !== false, "catmullrom", 0.18); }
 
   function roadGeom(T, curve, half, segs) {
     const pos = [], nor = [], uv = [], idx = [];
@@ -90,6 +90,24 @@
     return g;
   }
 
+  // 坂のある周回コース：道の両側に、地面まで下がる土手を作る（道が宙に浮いて見えないように）
+  function bankGeom(T, curve, half, slopeW, baseY, segs) {
+    const pos = [], idx = [];
+    const up = new T.Vector3(0, 1, 0), side = new T.Vector3(), tan = new T.Vector3(), p = new T.Vector3();
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs;
+      curve.getPointAt(t, p); curve.getTangentAt(t, tan);
+      side.crossVectors(up, tan).normalize();
+      const h = p.y - baseY, w = half + slopeW + h * 1.2;
+      [w, half, -half, -w].forEach((o, k) => pos.push(p.x + side.x * o, k === 0 || k === 3 ? baseY - 0.02 : p.y - 0.03, p.z + side.z * o));
+      if (i < segs) { const q = i * 4; for (let k = 0; k < 3; k++) idx.push(q + k, q + k + 4, q + k + 1, q + k + 1, q + k + 4, q + k + 5); }
+    }
+    const g = new T.BufferGeometry();
+    g.setAttribute("position", new T.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx); g.computeVertexNormals();
+    return g;
+  }
+
   function curbGeom(T, curve, half, segs, inward) {
     const pos = [], idx = [], col = [];
     const up = new T.Vector3(0, 1, 0), side = new T.Vector3(), tan = new T.Vector3(), p = new T.Vector3();
@@ -102,7 +120,7 @@
       if (inward) side.negate();
       const ox = p.x + side.x * (half - 0.05), oz = p.z + side.z * (half - 0.05);
       const ix = ox + side.x * w, iz = oz + side.z * w;
-      pos.push(ox, 0, oz, ox, h, oz, ix, h, iz, ix, 0, iz);
+      const yb = p.y; pos.push(ox, yb, oz, ox, yb + h, oz, ix, yb + h, iz, ix, yb, iz);
       const c = ((i / 2) | 0) % 2 ? cA : cB;
       for (let k = 0; k < 4; k++) col.push(c[0], c[1], c[2]);
       if (i < segs) {
@@ -119,7 +137,7 @@
   }
 
   function sampleAt(curve, t, outP, outT) {
-    const u = ((t % 1) + 1) % 1;
+    const u = curve.closed ? ((t % 1) + 1) % 1 : Math.max(0, Math.min(1, t));
     curve.getPointAt(u, outP);
     if (outT) curve.getTangentAt(u, outT);
     return u;
@@ -127,7 +145,7 @@
   function nearestT(curve, x, z, hint, segs) {
     let best = hint, bestD = 1e9;
     for (let k = -12; k <= 12; k++) {
-      const t = (((hint + k / segs) % 1) + 1) % 1;
+      const t = curve.closed ? (((hint + k / segs) % 1) + 1) % 1 : Math.max(0, Math.min(1, hint + k / segs));
       const p = curve.getPointAt(t);
       const dx = p.x - x, dz = p.z - z, d = dx * dx + dz * dz;
       if (d < bestD) { bestD = d; best = t; }
@@ -257,48 +275,56 @@
   }
 
 
-  function dressCourse(T, scene, curve, theme) {
+  function dressCourse(T, scene, curve, theme, R, RW) {
+    R = R || {}; RW = RW || ROAD_W;
+    const closed = curve.closed;
     const up = new T.Vector3(0, 1, 0);
     const at = (t, sideOff, y) => {
-      const p = curve.getPointAt(((t % 1) + 1) % 1), tan = curve.getTangentAt(((t % 1) + 1) % 1);
+      const u = closed ? ((t % 1) + 1) % 1 : Math.max(0, Math.min(1, t));
+      const p = curve.getPointAt(u), tan = curve.getTangentAt(u);
       const side = new T.Vector3().crossVectors(up, tan).normalize();
-      return { p, tan, side, x: p.x + side.x * sideOff, y: y || 0, z: p.z + side.z * sideOff, yaw: Math.atan2(tan.x, tan.z) };
+      return { p, tan, side, x: p.x + side.x * sideOff, y: p.y + (y || 0), z: p.z + side.z * sideOff, yaw: Math.atan2(tan.x, tan.z) };
     };
     // 木
-    const tree = makeTree(T, theme);
-    for (let i = 0; i < 16; i++) {
-      const t = (i * 0.041 + 0.02) % 1;
-      const s = (i % 2 ? 1 : -1) * (ROAD_W + 3.2 + (i % 5) * 0.7);
+    const tree = R.prop ? R.prop(T, theme) : makeTree(T, theme);
+    const nTree = R.propN || 16;
+    for (let i = 0; tree && i < nTree; i++) {
+      const t = nTree > 16 ? (i / nTree + 0.013) % 1 : (i * 0.041 + 0.02) % 1;
+      const s = (i % 2 ? 1 : -1) * (RW + 3.2 + (i % 5) * 0.7);
       const a = at(t, s);
-      const tr = tree.clone(); tr.position.set(a.x, 0, a.z); tr.rotation.y = i * 0.7;
+      const tr = tree.clone(); tr.position.set(a.x, a.y, a.z); tr.rotation.y = i * 0.7;
       tr.scale.setScalar(0.85 + (i % 4) * 0.15); scene.add(tr);
     }
     // 旗
     const flagMat = [0x5f3dc4, 0xffe066, 0xe03131].map((c) => new T.MeshLambertMaterial({ color: c, side: T.DoubleSide }));
-    for (let i = 0; i < 8; i++) {
-      const a = at(0.05 + i * 0.09, (i % 2 ? 1 : -1) * (ROAD_W + 1.6));
+    for (let i = 0; R.flags !== false && i < 8; i++) {
+      const a = at(0.05 + i * 0.09, (i % 2 ? 1 : -1) * (RW + 1.6));
       const pole = new T.Mesh(new T.CylinderGeometry(0.04, 0.05, 2.4, 5), new T.MeshLambertMaterial({ color: 0xced4da }));
-      pole.position.set(a.x, 1.2, a.z); scene.add(pole);
+      pole.position.set(a.x, a.y + 1.2, a.z); scene.add(pole);
       const fl = new T.Mesh(new T.PlaneGeometry(0.7, 0.42), flagMat[i % 3]);
-      fl.position.set(a.x + Math.cos(a.yaw) * 0.35, 2.1, a.z + Math.sin(a.yaw) * 0.35);
+      fl.position.set(a.x + Math.cos(a.yaw) * 0.35, a.y + 2.1, a.z + Math.sin(a.yaw) * 0.35);
       fl.rotation.y = a.yaw + Math.PI / 2; scene.add(fl);
     }
     // 看板（オリジナル）
-    const signs = [[0.12, "ほしの\nサーキット"], [0.4, "コーナー\n注意"], [0.68, "がんばって！"], [0.88, "ゴールまで\nもう少し"]];
+    const signs = R.signs || [[0.12, "ほしの\nサーキット"], [0.4, "コーナー\n注意"], [0.68, "がんばって！"], [0.88, "ゴールまで\nもう少し"]];
+    const backMat = new T.MeshLambertMaterial({ color: 0x5c5f66 });
     signs.forEach(([t, text], i) => {
-      const a = at(t, (i % 2 ? -1 : 1) * (ROAD_W + 2.4));
+      const a = at(t, (i % 2 ? -1 : 1) * (RW + 2.4));
       const post = new T.Mesh(new T.BoxGeometry(0.12, 1.8, 0.12), new T.MeshLambertMaterial({ color: 0x868e96 }));
-      post.position.set(a.x, 0.9, a.z); scene.add(post);
+      post.position.set(a.x, a.y + 0.9, a.z); scene.add(post);
+      // 表は走ってくる側に文字、裏はうら板（両面に同じ絵を貼ると裏から文字が反転して見えるため）
       const bd = new T.Mesh(new T.PlaneGeometry(1.6, 0.8), new T.MeshBasicMaterial({ map: signTex(T, text) }));
-      bd.position.set(a.x, 1.9, a.z); bd.rotation.y = a.yaw + Math.PI; scene.add(bd);
+      bd.position.set(a.x, a.y + 1.9, a.z); bd.rotation.y = a.yaw + Math.PI; scene.add(bd);
+      const bk = new T.Mesh(new T.PlaneGeometry(1.64, 0.84), backMat);
+      bk.position.set(a.x + Math.sin(a.yaw) * 0.02, a.y + 1.9, a.z + Math.cos(a.yaw) * 0.02); bk.rotation.y = a.yaw; scene.add(bk);
     });
     // 観客席（2か所、低いひな壇＋色つきの席）
     const seatMat = new T.MeshLambertMaterial({ color: 0xdee2e6 });
     const crowdGeo = new T.BoxGeometry(0.22, 0.38, 0.22);
     const benchGeo = new T.BoxGeometry(6.4, 0.32, 1.0);
     const palM = [0xe03131, 0x4dabf7, 0xffe066, 0x51cf66, 0xcc5de8, 0xffffff].map((c) => new T.MeshLambertMaterial({ color: c }));
-    [0.22, 0.72].forEach((t0, si) => {
-      const a = at(t0, (si ? -1 : 1) * (ROAD_W + 6.5));
+    (R.stands === false ? [] : (R.stands || [0.22, 0.72])).forEach((t0, si) => {
+      const a = at(t0, (si ? -1 : 1) * (RW + 6.5));
       const stand = new T.Group();
       for (let row = 0; row < 3; row++) {
         const st = new T.Mesh(benchGeo, seatMat);
@@ -308,23 +334,35 @@
           c.position.set(-2.4 + k * 0.85, 0.52 + row * 0.5, -row * 0.85); stand.add(c);
         }
       }
-      stand.position.set(a.x, 0, a.z); stand.rotation.y = a.yaw + (si ? 0 : Math.PI); scene.add(stand);
+      stand.position.set(a.x, a.y, a.z); stand.rotation.y = a.yaw + (si ? 0 : Math.PI); scene.add(stand);
     });
+    if (R.dress) R.dress(T, scene, curve, theme, at, RW);
     // スタート／ゴール：チェッカーライン＋細いゲート＋GOAL看板
-    const g0 = at(0, 0);
-    const check = new T.Mesh(new T.PlaneGeometry(ROAD_W * 2, 1.6), new T.MeshBasicMaterial({ map: checkerTex(T) }));
-    check.rotation.x = -Math.PI / 2; check.position.set(g0.p.x, 0.07, g0.p.z);
+    const g0 = at(closed ? 0 : FIN_T, 0);
+    const check = new T.Mesh(new T.PlaneGeometry(RW * 2, 1.6), new T.MeshBasicMaterial({ map: checkerTex(T) }));
+    check.rotation.x = -Math.PI / 2; check.position.set(g0.p.x, g0.p.y + 0.07, g0.p.z);
     check.rotation.z = -g0.yaw; scene.add(check);
     const postM = new T.MeshLambertMaterial({ color: 0x2b2155 });
     const posts = [];
     [-1, 1].forEach((s) => {
       const post = new T.Mesh(new T.CylinderGeometry(0.1, 0.12, 3.6, 8), postM);
-      post.position.set(g0.p.x + g0.side.x * s * (ROAD_W + 0.15), 1.8, g0.p.z + g0.side.z * s * (ROAD_W + 0.15));
+      post.position.set(g0.p.x + g0.side.x * s * (RW + 0.15), g0.p.y + 1.8, g0.p.z + g0.side.z * s * (RW + 0.15));
       scene.add(post); posts.push(post);
     });
-    const ban = new T.Mesh(new T.PlaneGeometry(ROAD_W * 2 + 0.4, 0.7), new T.MeshBasicMaterial({ map: bannerTex(T, "GOAL", "ほしのサーキット"), side: T.DoubleSide }));
-    ban.position.set(g0.p.x, 3.35, g0.p.z);
+    const banTex = bannerTex(T, "GOAL", R.courseName || "ほしのサーキット");
+    const ban = new T.Mesh(new T.PlaneGeometry(RW * 2 + 0.4, 0.7), new T.MeshBasicMaterial({ map: banTex }));
+    ban.position.set(g0.p.x, g0.p.y + 3.35, g0.p.z);
     ban.rotation.y = g0.yaw + Math.PI; scene.add(ban);
+    // 裏側にも、正しい向きの文字の看板を別に貼る（DoubleSide だと裏から反転して見える）
+    const ban2 = new T.Mesh(new T.PlaneGeometry(RW * 2 + 0.4, 0.7), new T.MeshBasicMaterial({ map: banTex }));
+    ban2.position.set(g0.p.x + Math.sin(g0.yaw) * 0.03, g0.p.y + 3.35, g0.p.z + Math.cos(g0.yaw) * 0.03);
+    ban2.rotation.y = g0.yaw; scene.add(ban2);
+    if (!closed) {
+      // 一方通行のコースはスタート位置にも白いライン
+      const s0 = at(0.012, 0);
+      const sl = new T.Mesh(new T.PlaneGeometry(RW * 2, 0.5), new T.MeshBasicMaterial({ color: 0xffffff }));
+      sl.rotation.x = -Math.PI / 2; sl.rotation.z = -s0.yaw; sl.position.set(s0.p.x, s0.p.y + 0.07, s0.p.z); scene.add(sl);
+    }
     return { check, ban, posts };
   }
 
@@ -340,9 +378,9 @@
     mesh.instanceMatrix.needsUpdate = true;
     this.mesh = mesh; this.dummy = dummy; this.i = 0; this.n = 56; this._d = 0;
   }
-  Marks.prototype.stamp = function (x, z, yaw) {
+  Marks.prototype.stamp = function (x, z, yaw, y) {
     const d = this.dummy;
-    d.position.set(x, 0.055, z);
+    d.position.set(x, (y || 0) + 0.055, z);
     d.rotation.set(-Math.PI / 2, yaw, 0, "YXZ");
     d.scale.set(1, 1, 1);
     d.updateMatrix();
@@ -365,11 +403,15 @@
 
   function boot(T, body, opts, diff) {
     const FX = Fx(); if (!FX) return;
-    const veh = Object.assign({}, VEHICLES[opts.vehicle || "kart"] || VEHICLES.kart);
-    const theme = THEMES[opts.theme || "campus"] || THEMES.campus;
-    const laps = clampLaps(opts.laps != null ? opts.laps : (window.HMRace3d && HMRace3d.pendingLaps));
+    const R = opts.race || {};
+    const veh = Object.assign({}, VEHICLES[opts.vehicle || "kart"] || VEHICLES.kart, R.veh || {});
+    const theme = Object.assign({}, THEMES[opts.theme || "campus"] || THEMES.campus, R.theme || {});
+    const closed = !R.sprint;
+    const laps = closed ? clampLaps(opts.laps != null ? opts.laps : (window.HMRace3d && HMRace3d.pendingLaps)) : 1;
+    const RW = R.roadW || ROAD_W;
+    const ACT = R.action || "drift";
     const GF = window.GF;
-    const st = { dead: false, unbind: [], body, t: 0, go: false, done: false, laps };
+    const st = { dead: false, unbind: [], body, t: 0, go: false, done: false, laps, id: opts.id || "kart" };
     const W0 = () => Math.max(260, body.clientWidth || 360);
     const H0 = () => Math.max(320, body.clientHeight || 520);
 
@@ -377,7 +419,7 @@
     body.innerHTML = '<div class="r3d">' +
       '<canvas class="r3d-gl"></canvas><canvas class="r3d-fx"></canvas>' +
       '<canvas class="r3d-map" width="140" height="140"></canvas>' +
-      '<div class="r3d-hud"><div class="r3d-pos">–</div><div class="r3d-lap">LAP 1/' + laps + '</div><div class="r3d-time">0.00</div>' +
+      '<div class="r3d-hud"><div class="r3d-pos">–</div><div class="r3d-lap">' + (closed ? "LAP 1/" + laps : "スタート") + '</div><div class="r3d-time">0.00</div>' +
       '<div class="r3d-item" hidden></div><div class="r3d-mt"><i></i></div></div>' +
       '<div class="r3d-cheer" hidden></div><div class="r3d-final" hidden>ファイナルラップ</div>' +
       '<div class="r3d-cd"></div>' +
@@ -391,8 +433,8 @@
           '<button type="button" class="r3d-btn stop" data-hold="brake">とまる</button>' +
         "</div>" +
         '<div class="r3d-col right">' +
-          '<button type="button" class="r3d-btn drift" data-hold="drift">ドリフト</button>' +
-          '<button type="button" class="r3d-btn item" data-item="1">アイテム</button>' +
+          '<button type="button" class="r3d-btn drift" data-hold="drift">' + (R.actionLabel || "ドリフト") + '</button>' +
+          (R.items === false ? '' : '<button type="button" class="r3d-btn item" data-item="1">アイテム</button>') +
         "</div></div></div>";
 
     const glcv = body.querySelector(".r3d-gl");
@@ -406,7 +448,7 @@
     const scene = new T.Scene();
     scene.background = new T.Color(theme.sky);
     scene.fog = new T.Fog(theme.fog, theme.fogNear, theme.fogFar);
-    const camera = new T.PerspectiveCamera(55, 1, 0.1, 220);
+    const camera = new T.PerspectiveCamera(R.fov || 55, 1, 0.1, R.far || 240);
     st.camera = camera;
     let dpr = Math.min(window.devicePixelRatio || 1, 1.6);
     let renderer;
@@ -414,42 +456,97 @@
       renderer = new T.WebGLRenderer({ canvas: glcv, antialias: dpr < 1.4, alpha: false, powerPreference: "high-performance" });
     } catch (err) {
       console.error(err);
-      if (prevKart) prevKart(diff);
+      const fb = opts.fallback || prevKart;
+      if (fb) fb(diff);
       return;
     }
     renderer.setClearColor(theme.sky, 1);
     if (T.SRGBColorSpace) renderer.outputColorSpace = T.SRGBColorSpace;
     st.renderer = renderer;
-    scene.add(new T.HemisphereLight(0xe8f0ff, 0x3d5a3a, 1.05));
-    const sun = new T.DirectionalLight(0xfff4e0, 0.85); sun.position.set(30, 50, 10); scene.add(sun);
+    scene.add(new T.HemisphereLight(R.hemiSky || 0xe8f0ff, R.hemiGround || 0x3d5a3a, R.hemi || 1.05));
+    const sun = new T.DirectionalLight(R.sunCol || 0xfff4e0, R.sun || 0.85); sun.position.set(30, 50, 10); scene.add(sun);
 
-    const curve = makeCurve(T, campusPoints(T));
-    const segs = 180;
-    scene.add(new T.Mesh(roadGeom(T, curve, ROAD_W, segs), new T.MeshLambertMaterial({ color: theme.road })));
-    const mid = new T.Mesh(roadGeom(T, curve, 0.08, 120), new T.MeshBasicMaterial({ color: theme.roadLine }));
-    mid.position.y = 0.03; scene.add(mid);
-    const curbMat = new T.MeshLambertMaterial({ vertexColors: true });
-    scene.add(new T.Mesh(curbGeom(T, curve, ROAD_W, 140, false), curbMat));
-    scene.add(new T.Mesh(curbGeom(T, curve, ROAD_W, 140, true), curbMat));
-    const ground = new T.Mesh(new T.CircleGeometry(90, 28), new T.MeshLambertMaterial({ color: theme.grass }));
-    ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; scene.add(ground);
-    dressCourse(T, scene, curve, theme);
+    const curve = makeCurve(T, R.points ? R.points(T) : campusPoints(T), closed, !!R.points);
+    const curveLen = curve.getLength();
+    // 長いコースでも、近い点を探す細かさ（約1.4m）をカートと同じにする
+    const segs = Math.max(180, Math.round(curveLen / 1.45));
+    const roadMat = R.roadMat ? R.roadMat(T, theme) : new T.MeshLambertMaterial({ color: theme.road });
+    st.roadMat = roadMat;
+    scene.add(new T.Mesh(roadGeom(T, curve, RW, Math.round(segs * 0.7)), roadMat));
+    if (R.midLine !== false) {
+      const mid = new T.Mesh(roadGeom(T, curve, 0.08, Math.round(segs * 0.6)), new T.MeshBasicMaterial({ color: theme.roadLine }));
+      mid.position.y = 0.03; scene.add(mid);
+    }
+    if (R.curbs !== false) {
+      const curbMat = new T.MeshLambertMaterial({ vertexColors: true });
+      const cs = Math.max(140, Math.round(curveLen / 1.9));
+      scene.add(new T.Mesh(curbGeom(T, curve, RW, cs, false), curbMat));
+      scene.add(new T.Mesh(curbGeom(T, curve, RW, cs, true), curbMat));
+    }
+    if (R.ground !== false) {
+      if (closed) {
+        const box = new T.Box3().setFromPoints(curve.getSpacedPoints(60));
+        const cx = (box.min.x + box.max.x) / 2, cz = (box.min.z + box.max.z) / 2;
+        const rad = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) / 2 + 50;
+        const ground = new T.Mesh(new T.CircleGeometry(Math.max(90, rad), 32), new T.MeshLambertMaterial({ color: theme.grass }));
+        ground.rotation.x = -Math.PI / 2; ground.position.set(cx, box.min.y - 0.05, cz); scene.add(ground);
+        if (box.max.y - box.min.y > 0.6) {
+          const bank = new T.Mesh(bankGeom(T, curve, RW, 3, box.min.y - 0.04, Math.round(segs * 0.5)), new T.MeshLambertMaterial({ color: theme.grass2 || theme.grass, side: T.DoubleSide }));
+          scene.add(bank);
+        }
+      } else {
+        // 一方通行（坂道）のコースは、道にそった広い地面
+        const gnd = new T.Mesh(roadGeom(T, curve, RW + (R.groundW || 46), Math.round(segs * 0.5)), new T.MeshLambertMaterial({ color: theme.grass }));
+        gnd.position.y = -0.09; scene.add(gnd);
+      }
+    }
+    dressCourse(T, scene, curve, theme, R, RW);
     const fx3 = new FX.ThreeFx(T, scene); st.fx3 = fx3;
     const marks = new Marks(T, scene); st.marks = marks;
 
     const boxGeo = new T.BoxGeometry(0.7, 0.7, 0.7);
     const boxMat = new T.MeshLambertMaterial({ color: 0x74c0fc });
     const boxes = [];
-    [0.18, 0.37, 0.58, 0.79].forEach((t0) => {
+    (R.items === false ? [] : (R.boxes || [0.18, 0.37, 0.58, 0.79])).forEach((t0) => {
       [-0.35, 0.35].forEach((off) => {
         const p = curve.getPointAt(t0), tan = curve.getTangentAt(t0);
         const side = new T.Vector3().set(0, 1, 0).cross(tan).normalize();
         const m = new T.Mesh(boxGeo, boxMat.clone());
-        m.position.set(p.x + side.x * off * ROAD_W * 0.55, 0.7, p.z + side.z * off * ROAD_W * 0.55);
+        m.position.set(p.x + side.x * off * RW * 0.55, p.y + 0.7, p.z + side.z * off * RW * 0.55);
         scene.add(m);
-        boxes.push({ m, t: t0, off, ready: 0, live: true });
+        boxes.push({ m, t: t0, off, ready: 0, live: true, y0: p.y });
       });
     });
+
+    // ---- コースのしかけ（ジャンプ台・ダッシュ板・どろ・障害物）----
+    const upV = new T.Vector3(0, 1, 0);
+    function placeOn(tt, off, y) {
+      const u = closed ? ((tt % 1) + 1) % 1 : Math.max(0, Math.min(1, tt));
+      const pp = curve.getPointAt(u), tn = curve.getTangentAt(u);
+      const sd = new T.Vector3().crossVectors(upV, tn).normalize();
+      return { x: pp.x + sd.x * off, y: pp.y + (y || 0), z: pp.z + sd.z * off, yaw: Math.atan2(tn.x, tn.z), side: sd, p: pp, tan: tn };
+    }
+    const ramps = (R.ramps || []).map((rt) => {
+      const a = placeOn(rt, 0);
+      const m = R.rampMesh ? R.rampMesh(T, RW) : (() => {
+        const g = new T.Group();
+        const w = new T.Mesh(new T.BoxGeometry(RW * 1.5, 0.5, 2.6), new T.MeshLambertMaterial({ color: R.rampCol || 0xf08c00 }));
+        w.rotation.x = -0.2; w.position.y = 0.18; g.add(w);
+        const s = new T.Mesh(new T.BoxGeometry(RW * 1.5, 0.08, 0.5), new T.MeshBasicMaterial({ color: 0xffffff }));
+        s.position.set(0, 0.47, 1.05); s.rotation.x = -0.2; g.add(s);
+        return g;
+      })();
+      m.position.set(a.x, a.y, a.z); m.rotation.y = a.yaw; scene.add(m);
+      return { t: rt, m };
+    });
+    const hz = (R.hazards || []).map((h) => {
+      const off = (h.off || 0) * RW * 0.62;
+      const a = placeOn(h.t, off);
+      const m = R.hazardMesh ? R.hazardMesh(T, h.kind, theme) : null;
+      if (m) { m.position.set(a.x, a.y, a.z); m.rotation.y = a.yaw; scene.add(m); }
+      return { kind: h.kind, x: a.x, y: a.y, z: a.z, yaw: a.yaw, m, r: h.r || (h.kind === "mud" || h.kind === "pad" || h.kind === "ring" ? 1.9 : 1.0), cool: 0 };
+    });
+    st.ramps = ramps; st.hz = hz;
 
     let meCol = 0xe03131, meAcc = 0xffe066, pName = "";
     try {
@@ -459,28 +556,31 @@
       if (ch && ch.color) meCol = new T.Color(ch.color).getHex();
       if (ch && (ch.call || ch.name)) pName = ch.call || ch.name;
     } catch (e) {}
-    const pal = [0x4dabf7, 0x51cf66, 0xcc5de8, 0xff922b, 0x20c997, 0xf06595, 0xe8590c];
+    const pal = R.pal || [0x4dabf7, 0x51cf66, 0xcc5de8, 0xff922b, 0x20c997, 0xf06595, 0xe8590c];
+    const NR = R.racers || RACERS;
+    const build = R.build || buildKart;
+    const T0 = closed ? 0.995 : 0.03;
     const names = ["あおい", "みどり", "すみれ", "ひなた", "かい", "りん", "翔太"];
     const sk = skillOf(diff);
     const racers = [];
-    const p0 = curve.getPointAt(0.995), t0v = curve.getTangentAt(0.995);
+    const p0 = curve.getPointAt(T0), t0v = curve.getTangentAt(T0);
     const side0 = new T.Vector3().set(0, 1, 0).cross(t0v).normalize();
     const yaw0 = Math.atan2(t0v.x, t0v.z);
-    for (let i = 0; i < RACERS; i++) {
+    for (let i = 0; i < NR; i++) {
       const meF = i === 0;
-      const lane = (i % 2 ? 1 : -1) * (1.6 + (i % 2) * 0.2);
-      const back = Math.floor(i / 2) * 2.8;
+      const lane = R.grid ? R.grid(i, RW).lane : (i % 2 ? 1 : -1) * (1.6 + (i % 2) * 0.2);
+      const back = R.grid ? R.grid(i, RW).back : Math.floor(i / 2) * 2.8;
       const col = meF ? meCol : pal[(i - 1) % pal.length];
       const acc = meF ? meAcc : 0xffffff;
-      const mesh = buildKart(T, col, acc, meF, i + 1);
+      const mesh = build(T, col, acc, meF, i + 1, theme);
       const x = p0.x - t0v.x * back + side0.x * lane;
       const z = p0.z - t0v.z * back + side0.z * lane;
-      mesh.position.set(x, 0, z); mesh.rotation.y = yaw0; scene.add(mesh);
+      mesh.position.set(x, p0.y, z); mesh.rotation.y = yaw0; scene.add(mesh);
       racers.push({
         me: meF, name: meF ? (GF.getNick && GF.getNick() || "きみ") : names[i - 1],
-        col, mesh, x, y: 0, z, yaw: yaw0, speed: 0, slip: 0, steer: 0,
+        col, mesh, x, y: p0.y, z, yaw: yaw0, speed: 0, slip: 0, steer: 0, idx: i, stam: 1, pen: 0, ay: 0, vy: 0, air: 0, nitro: 0.35, draft: 0,
         drift: 0, charge: 0, boost: 0, hit: 0, ink: 0, shield: 0,
-        item: null, lap: 0, sector: 0, t: 0.995, place: i + 1, fin: 0,
+        item: null, lap: 0, sector: 0, t: T0, place: i + 1, fin: 0,
         sk: meF ? 1 : (sk * (0.96 + (i * 0.012) % 0.08)), spin: 0, roll: 0, pitch: 0, lastStamp: 0
       });
     }
@@ -495,6 +595,7 @@
       if (!input._touchDrift) input.drift = keys.drift;
     }
     st.input = input; st.me = me; st.racers = racers; st.keys = keys;
+    const ctx = { T, scene, curve, closed, RW, theme, racers, me, st, input, veh, laps, placeOn, curveLen, FX: null, fx3: null, say: null };
 
     function bindHold(el, key) {
       const ids = new Set();
@@ -537,12 +638,14 @@
       FX.SFX.itemUse();
       if (it === "boost") { me.boost = Math.max(me.boost, 1.4); FX.SFX.boost(); shake.add(5); overlay.flash("#74c0fc", 0.3); }
       else if (it === "shield") { me.shield = 2.2; overlay.flash("#ffe066", 0.2); }
-      else if (it === "ink") { st.puddles.push(makePuddle(me.x, me.z)); }
+      else if (it === "ink") { st.puddles.push(makePuddle(me.x, me.z, me.y - me.ay)); }
       else if (it === "star") { st.shots.push(makeShot(me, me.yaw)); FX.SFX.whoosh(); }
     };
     const onItem = (e) => { e.preventDefault(); useItem(); };
-    itemBtn.addEventListener("pointerdown", onItem);
-    st.unbind.push(() => itemBtn.removeEventListener("pointerdown", onItem));
+    if (itemBtn) {
+      itemBtn.addEventListener("pointerdown", onItem);
+      st.unbind.push(() => itemBtn.removeEventListener("pointerdown", onItem));
+    }
 
     const kd = (e) => {
       const k = e.key, kl = k.length === 1 ? k.toLowerCase() : k;
@@ -567,15 +670,16 @@
     st.unbind.push(() => { window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku); });
 
     st.puddles = []; st.shots = [];
-    function makePuddle(x, z) {
+    function makePuddle(x, z, y) {
       const mesh = new T.Mesh(new T.CircleGeometry(1.25, 14), new T.MeshBasicMaterial({ color: 0x1a1d27, transparent: true, opacity: 0.72 }));
-      mesh.rotation.x = -Math.PI / 2; mesh.position.set(x, 0.08, z); scene.add(mesh);
+      mesh.rotation.x = -Math.PI / 2; mesh.position.set(x, (y || 0) + 0.08, z); scene.add(mesh);
       return { x, z, life: 7, mesh };
     }
     function makeShot(from, yaw) {
       const mesh = new T.Mesh(new T.SphereGeometry(0.22, 8, 6), new T.MeshBasicMaterial({ color: 0xffe066 }));
-      mesh.position.set(from.x, 0.7, from.z); scene.add(mesh);
-      return { x: from.x, y: 0.7, z: from.z, yaw, life: 2.2, from, mesh };
+      const sy = from.y - (from.ay || 0) + 0.7;
+      mesh.position.set(from.x, sy, from.z); scene.add(mesh);
+      return { x: from.x, y: sy, z: from.z, t: from.t, yaw, life: 2.2, from, mesh };
     }
     const cheer = body.querySelector(".r3d-cheer");
     const finalEl = body.querySelector(".r3d-final");
@@ -588,6 +692,28 @@
       const p = (GF.advantage && GF.advantage().partner) || "";
       say(p === "shota" ? "先輩、いってらっしゃいっす！" : ((pName || "相棒") + "「いってらっしゃい！ 1位めざそう！」"));
     } catch (e) { say("いってらっしゃい！ 1位めざそう！"); }
+
+    ctx.FX = FX; ctx.fx3 = fx3; ctx.say = say; ctx.overlay = overlay; ctx.shake = shake; ctx.camera = camera; ctx.raced = () => raced; ctx.progress = (r) => progress(r);
+    const hooks = R.setup ? R.setup(ctx) : null;
+    st.hooks = hooks;
+    // スリップストリーム：前の相手のすぐ後ろにつくと、空気の抵抗が減って速くなる
+    let draftSaid = 0;
+    function stepDraft(dt) {
+      racers.forEach((r) => {
+        const fx = Math.sin(r.yaw), fz = Math.cos(r.yaw);
+        let on = false;
+        for (const o of racers) {
+          if (o === r || o.speed < 6) continue;
+          const dx = o.x - r.x, dz = o.z - r.z, al = dx * fx + dz * fz, lat = Math.abs(dx * fz - dz * fx);
+          if (al > 1.2 && al < 6.5 && lat < 1.35) { on = true; break; }
+        }
+        r.draft = Math.max(0, Math.min(1, r.draft + (on ? dt * 1.6 : -dt * 1.2)));
+        if (r.me && r.draft > 0.6) {
+          if (st.t - draftSaid > 7) { draftSaid = st.t; say("スリップストリーム！ 前の人のうしろで風よけ"); }
+          if (Math.random() < dt * 10) fx3.burst(new T.Vector3(r.x + fx * 1.4, r.y + 0.8, r.z + fz * 1.4), ["#ffffff", "#d0ebff"], 1, 6, 0.25);
+        }
+      });
+    }
 
     function layout() {
       const w = W0(), h = H0();
@@ -614,7 +740,7 @@
     const hudMt = body.querySelector(".r3d-mt i");
     const cdEl = body.querySelector(".r3d-cd");
 
-    function progress(r) { return r.lap + (((r.t - 0.995) % 1) + 1) % 1; }
+    function progress(r) { return closed ? r.lap + (((r.t - 0.995) % 1) + 1) % 1 : r.t; }
     function rank() {
       const a = racers.slice().sort((x, y) => progress(y) - progress(x) || (x.fin || 99) - (y.fin || 99));
       a.forEach((r, i) => { r.place = i + 1; });
@@ -625,7 +751,7 @@
       if (side.lengthSq() < 1e-6) side.set(1, 0, 0); else side.normalize();
       const dx = r.x - p.x, dz = r.z - p.z;
       const lat = dx * side.x + dz * side.z;
-      const lim = ROAD_W - 0.7;
+      const lim = RW - 0.7;
       if (Math.abs(lat) > lim) {
         const over = Math.abs(lat) - lim, sgn = lat > 0 ? 1 : -1;
         r.x -= side.x * sgn * (over + 0.04);
@@ -639,7 +765,7 @@
         if (first) {
           r.speed *= 0.78;
           r.hit = 0.18;
-          if (r.me) { shake.add(7); FX.SFX.crash(); fx3.burst(new T.Vector3(r.x, 0.3, r.z), ["#fff", "#ffd43b"], 10, 5, 0.35); }
+          if (r.me) { shake.add(7); FX.SFX.crash(); fx3.burst(new T.Vector3(r.x, r.y + 0.3, r.z), ["#fff", "#ffd43b"], 10, 5, 0.35); }
         }
         return true;
       }
@@ -656,27 +782,42 @@
       r.hit = Math.max(0, r.hit - dt); r.boost = Math.max(0, r.boost - dt); r.ink = Math.max(0, r.ink - dt); r.shield = Math.max(0, r.shield - dt);
       let steer = r.me ? playerSteer() : r.steer;
       const spd = Math.abs(r.speed);
-      const drifting = !r.fin && isGo && (r.me ? input.drift : r.wantDrift) && Math.abs(steer) > 0.2 && r.speed > 7;
+      const actOn = !r.fin && isGo && (r.me ? input.drift : r.wantDrift);
+      const drifting = ACT === "drift" && actOn && Math.abs(steer) > 0.2 && r.speed > 7 && !r.air;
+      // ドリフト以外のボタン：スパート（スタミナを使う）・クラウチ（前かがみ）・ニトロ
+      r.spurt = 0;
+      if (ACT === "spurt") {
+        if (actOn && r.stam > 0.02 && r.speed > 3) { r.spurt = 1; r.stam = Math.max(0, r.stam - dt * (R.stamUse || 0.26)); }
+        else r.stam = Math.min(1, r.stam + dt * (R.stamGain || 0.075));
+      } else if (ACT === "tuck") {
+        r.spurt = actOn && r.speed > 3 ? 1 : 0;
+      } else if (ACT === "nitro") {
+        if (actOn && r.nitro > 0.02) { r.spurt = 1; r.nitro = Math.max(0, r.nitro - dt * 0.42); r.boost = Math.max(r.boost, 0.12); }
+      }
+      if (r.air) steer *= 0.35;
       if (drifting) {
         r.drift = 1; r.charge += dt; r.slip += (steer * 0.9 - r.slip) * dt * 4;
         if (r.me && Math.random() < dt * 10) {
           FX.SFX.drift();
-          fx3.burst(new T.Vector3(r.x - Math.cos(r.yaw) * 0.5, 0.12, r.z + Math.sin(r.yaw) * 0.5), ["#cfd4e0", "#fff", "#ffd43b"], 4, 3, 0.28);
+          fx3.burst(new T.Vector3(r.x - Math.cos(r.yaw) * 0.5, r.y + 0.12, r.z + Math.sin(r.yaw) * 0.5), ["#cfd4e0", "#fff", "#ffd43b"], 4, 3, 0.28);
         }
         r.lastStamp += spd * dt;
-        if (r.lastStamp > 0.42) { r.lastStamp = 0; marks.stamp(r.x - Math.sin(r.yaw) * 0.55, r.z - Math.cos(r.yaw) * 0.55, r.yaw); }
+        if (r.lastStamp > 0.42) { r.lastStamp = 0; marks.stamp(r.x - Math.sin(r.yaw) * 0.55, r.z - Math.cos(r.yaw) * 0.55, r.yaw, r.y - r.ay); }
       } else {
         r.drift = 0; r.slip += (0 - r.slip) * dt * 6;
         if (r.charge >= veh.mt2) { r.boost = Math.max(r.boost, veh.mt2Boost); if (r.me) { FX.SFX.boost(); overlay.flash("#ff922b", 0.28); shake.add(4); } }
         else if (r.charge >= veh.mt1) { r.boost = Math.max(r.boost, veh.mt1Boost); if (r.me) { FX.SFX.boost(); overlay.flash("#74c0fc", 0.22); } }
         r.charge = 0; r.lastStamp = 0;
       }
-      const cap = r.boost > 0 ? veh.boostMax : veh.max;
+      let cap = r.boost > 0 ? veh.boostMax : veh.max;
+      if (r.spurt && ACT !== "nitro") cap *= ACT === "tuck" ? 1.12 : 1.16;
+      if (r.draft > 0) cap += 2.4 * r.draft;
+      if (r.mud > 0) cap *= 0.62;
       const inkMul = r.ink > 0 && r.shield <= 0 ? 0.52 : 1;
       if (isGo && !r.fin) {
         const acc = r.me ? input.accel : 1;
         const brk = r.me ? input.brake : 0;
-        if (acc) r.speed += veh.accel * dt * (r.boost > 0 ? 1.45 : 1) * (r.me ? 1 : r.sk);
+        if (acc) r.speed += veh.accel * dt * (r.boost > 0 ? 1.45 : 1) * (r.spurt ? 1.3 : 1) * (r.me ? 1 : r.sk);
         if (brk) {
           if (r.speed > 0.35) r.speed -= veh.brake * dt;
           else r.speed -= veh.brake * 0.4 * dt;
@@ -687,30 +828,71 @@
       if (r.speed > cap * inkMul) r.speed += (cap * inkMul - r.speed) * dt * 3;
       if (r.speed < -(veh.revMax || 7)) r.speed += (-(veh.revMax || 7) - r.speed) * dt * 4;
       if (r.hit > 0) r.speed *= 1 - dt * 0.8;
-      const turn = (r.drift ? veh.driftTurn : veh.turn) * (0.45 + 0.55 * Math.min(1, spd / 14));
+      const turn = (r.drift ? veh.driftTurn : veh.turn) * (0.45 + 0.55 * Math.min(1, spd / 14)) * (ACT === "tuck" && r.spurt ? 0.6 : 1);
       r.yaw += steer * turn * dt * (spd / Math.max(4, veh.max)) * (r.drift ? 1.15 : 1);
       const yaw = r.yaw + r.slip * 0.35;
       r.x += Math.sin(yaw) * r.speed * dt;
       r.z += Math.cos(yaw) * r.speed * dt;
       r.t = nearestT(curve, r.x, r.z, r.t, segs);
       sampleAt(curve, r.t, tmpP, tmpT);
-      r.y = tmpP.y; hitEdge(r, r.t, tmpP, tmpT);
-      const sec = Math.floor(((((r.t - 0.995) % 1) + 1) % 1) * 8);
+      // 波・流れ（ボートなど）：横に流される
+      if (R.current && isGo && !r.fin) {
+        const sx = tmpT.z, sz = -tmpT.x, k = Math.sin(st.t * 0.9 + r.t * 40) * R.current * dt;
+        r.x += sx * k; r.z += sz * k;
+      }
+      // ジャンプ台
+      const prevT = r._pt == null ? r.t : r._pt; r._pt = r.t;
+      if (!r.air && r.speed > 8) ramps.forEach((rp) => {
+        if ((prevT < rp.t && r.t >= rp.t && r.t - prevT < 0.05)) {
+          r.air = 1; r.vy = 3.2 + r.speed * 0.17;
+          if (r.me) { FX.SFX.whoosh(); shake.add(3); }
+        }
+      });
+      if (r.air) {
+        r.ay += r.vy * dt; r.vy -= 17 * dt;
+        if (r.ay <= 0) {
+          r.ay = 0; r.air = 0; r.vy = 0;
+          if (r.me) { shake.add(6); FX.SFX.hit(); fx3.burst(new T.Vector3(r.x, tmpP.y + 0.2, r.z), R.spray || ["#fff", "#ffd43b"], 12, 5, 0.4); }
+          if (R.landBoost) r.boost = Math.max(r.boost, R.landBoost);
+        }
+      }
+      r.y = tmpP.y + r.ay; hitEdge(r, r.t, tmpP, tmpT);
+      // しかけに当たる
+      r.mud = Math.max(0, (r.mud || 0) - dt);
+      for (let k = 0; k < hz.length; k++) {
+        const h = hz[k]; if (r.air && h.kind !== "ring") continue;
+        const dx = r.x - h.x, dz = r.z - h.z;
+        if (dx * dx + dz * dz > h.r * h.r * 1.5) continue;
+        if (h.kind === "mud") { if (r.shield <= 0) r.mud = 0.35; if (r.me && Math.random() < dt * 8) fx3.burst(new T.Vector3(r.x, r.y + 0.2, r.z), R.mudCol || ["#6b4423", "#8b5a2b"], 3, 3, 0.35); }
+        else if (h.kind === "pad" || h.kind === "ring") {
+          if (r.boost < 0.6) { r.boost = Math.max(r.boost, h.kind === "ring" ? 1.1 : 0.9); if (r.me) { FX.SFX.boost(); overlay.flash("#74c0fc", 0.25); shake.add(3); } }
+        } else if (r.shield <= 0 && r.hit <= 0.05) {
+          r.hit = 0.45; r.speed *= 0.55; r.slip += (dx * tmpT.z - dz * tmpT.x) > 0 ? 0.6 : -0.6;
+          if (r.me) { shake.add(8); FX.SFX.crash(); fx3.burst(new T.Vector3(h.x, h.y + 0.5, h.z), R.spray || ["#fff", "#ffd43b"], 10, 5, 0.4); }
+        }
+      }
+      if (R.onRacer) R.onRacer(ctx, r, dt, isGo);
+      if (!closed) {
+        if (r.t >= FIN_T && !r.fin && isGo) { r.fin = raced + r.pen; rank(); if (r.me) finish(); }
+        if (r.me && r.t > 0.78 && !saidFinal) { saidFinal = true; finalEl.textContent = R.lastText || "ラストスパート！"; finalEl.hidden = false; finalT = 2.4; FX.SFX.star(); }
+      }
+      const sec = closed ? Math.floor(((((r.t - 0.995) % 1) + 1) % 1) * 8) : -1;
       if (r.secBits == null) r.secBits = 0;
       if (sec === (r.sector + 1) % 8) {
         r.sector = sec;
         r.secBits |= (1 << sec);
         if (sec === 0 && (r.secBits & 0xFE) === 0xFE && !r.fin) { r.lap++; r.secBits = 1; }
       }
-      if (r.lap >= laps && !r.fin) { r.fin = raced; rank(); if (r.me) finish(); }
-      if (r.me && r.lap === laps - 1 && !saidFinal) {
+      if (closed && r.lap >= laps && !r.fin) { r.fin = raced + r.pen; rank(); if (r.me) finish(); }
+      if (closed && r.me && r.lap === laps - 1 && !saidFinal) {
         saidFinal = true; finalEl.hidden = false; finalT = 2.6; FX.SFX.star();
       }
       // 見た目：タイヤ回転・切れ角・ロール・ピッチ・炎・影
       r.spin += r.speed * dt * 2.4;
       r.roll += ((-steer * 0.22 - r.slip * 0.14) - r.roll) * dt * 8;
       const accNow = (r.me ? (input.accel ? 1 : 0) - (input.brake ? 1 : 0) : 0.4);
-      r.pitch += ((accNow * 0.06 - r.speed * 0.004) - r.pitch) * dt * 8;
+      const slope = r.air ? 0 : -Math.asin(Math.max(-0.6, Math.min(0.6, tmpT.y)));
+      r.pitch += ((accNow * 0.06 - r.speed * 0.004 + slope) - r.pitch) * dt * 8;
       r.mesh.position.set(r.x, r.y, r.z);
       r.mesh.rotation.set(0, r.yaw, 0);
       const ud = r.mesh.userData;
@@ -729,20 +911,30 @@
           if (r.boost > 0) fl.material.color.set(i ? 0xff922b : 0x74c0fc);
         });
       }
-      if (ud && ud.shadow) ud.shadow.position.set(0, 0.03, 0);
+      if (ud && ud.shadow) { ud.shadow.position.set(0, 0.03 - r.ay, 0); const s = Math.max(0.45, 1 - r.ay * 0.18); ud.shadow.scale.set(s, s, s); }
+      if (R.bob) { const b = Math.sin(st.t * 3.1 + r.idx * 1.7) * R.bob * (0.4 + Math.min(1, spd / 12)); r.mesh.position.y += b; if (ud && ud.body) ud.body.rotation.x += Math.cos(st.t * 3.1 + r.idx * 1.7) * R.bob * 0.5; }
+      if (ud && ud.anim) ud.anim(r, dt, st.t, steer, r.me ? input : null);
+      if (R.spray && spd > 6 && !r.air && Math.random() < dt * (r.me ? 14 : 4)) {
+        fx3.burst(new T.Vector3(r.x - Math.sin(r.yaw) * 0.9, r.y + 0.15, r.z - Math.cos(r.yaw) * 0.9), R.spray, r.me ? 3 : 2, 2.5 + spd * 0.08, 0.35);
+      }
     }
 
     function cpu(r, dt) {
-      sampleAt(curve, r.t + 0.045 * r.sk, tmpP, tmpT);
+      sampleAt(curve, r.t + (11.7 / curveLen) * (R.look || 1) * r.sk, tmpP, tmpT);
       const want = Math.atan2(tmpP.x - r.x, tmpP.z - r.z);
       let err = want - r.yaw; while (err > Math.PI) err -= Math.PI * 2; while (err < -Math.PI) err += Math.PI * 2;
       r.steer = Math.max(-1, Math.min(1, err * 1.6));
       r.wantDrift = Math.abs(err) > 0.45 && r.speed > 10;
+      if (ACT !== "drift") {
+        const pr = progress(r), endish = closed ? (r.lap >= laps - 1 && (pr % 1) > 0.55) : pr > 0.62;
+        r.wantDrift = ACT === "tuck" ? Math.abs(err) < 0.12 : ACT === "nitro" ? (r.nitro > 0.5 && Math.abs(err) < 0.2) : (endish && r.stam > 0.05) || r.stam > 0.97;
+      }
+      if (R.cpu) R.cpu(ctx, r, dt);
       if (r.item && Math.random() < dt * 0.35) {
         const it = r.item; r.item = null;
         if (it === "boost") r.boost = Math.max(r.boost, 1.2);
         else if (it === "shield") r.shield = 2;
-        else if (it === "ink") st.puddles.push(makePuddle(r.x, r.z));
+        else if (it === "ink") st.puddles.push(makePuddle(r.x, r.z, r.y - r.ay));
         else if (it === "star") st.shots.push(makeShot(r, r.yaw));
       }
     }
@@ -750,7 +942,7 @@
     function pickBoxes(dt) {
       const spin = st.t * 2;
       boxes.forEach((b) => {
-        b.m.rotation.y = spin; b.m.position.y = 0.7 + Math.sin(st.t * 3 + b.t * 8) * 0.08;
+        b.m.rotation.y = spin; b.m.position.y = b.y0 + 0.7 + Math.sin(st.t * 3 + b.t * 8) * 0.08;
         if (!b.live) { b.ready -= dt; if (b.ready <= 0) { b.live = true; b.m.visible = true; } return; }
         racers.forEach((r) => {
           if (!b.live || r.fin) return;
@@ -766,6 +958,7 @@
       });
     }
     function dropShot(s) { if (s.mesh) scene.remove(s.mesh); }
+    const shP = new T.Vector3(), shT = new T.Vector3();
     function stepHazards(dt) {
       for (let i = st.puddles.length - 1; i >= 0; i--) {
         const p = st.puddles[i]; p.life -= dt;
@@ -780,6 +973,7 @@
       for (let i = st.shots.length - 1; i >= 0; i--) {
         const sh = st.shots[i]; sh.life -= dt;
         sh.x += Math.sin(sh.yaw) * 38 * dt; sh.z += Math.cos(sh.yaw) * 38 * dt;
+        sh.t = nearestT(curve, sh.x, sh.z, sh.t, segs); sampleAt(curve, sh.t, shP, shT); sh.y += (shP.y + 0.7 - sh.y) * Math.min(1, dt * 10);
         if (sh.mesh) sh.mesh.position.set(sh.x, sh.y, sh.z);
         if (sh.life <= 0) { dropShot(sh); st.shots.splice(i, 1); continue; }
         let hitOne = false;
@@ -800,15 +994,20 @@
       st.done = true; st.go = false;
       if (st.engine) st.engine.stop();
       FX.SFX.finish();
+      // ペナルティ（スキーの旗門など）があるときは、タイムで順位を決める（まだゴールしていない相手は今のペースで見積もる）
+      if (racers.some((r) => r.pen > 0)) {
+        const est = (r) => r.fin || (raced + r.pen + Math.max(0, (closed ? laps - progress(r) : FIN_T - r.t)) * curveLen / Math.max(6, r.speed || veh.max * 0.8));
+        me.place = 1 + racers.filter((r) => r !== me && est(r) < me.fin).length;
+      }
       const place = me.place, win = place === 1;
       say(win ? "1位！ すごい！" : place + "位だったよ。もう一回いってみよう！");
       overlay.flash(win ? "#ffe066" : "#9fb4ff", 0.45);
-      GF.reportGame("kart", diff, win, { metric: { v: Math.round(me.fin * 100) / 100, unit: "秒", lower: true, label: "タイム", winOnly: false } });
+      GF.reportGame(st.id, diff, win, { metric: { v: Math.round(me.fin * 100) / 100, unit: "秒", lower: true, label: "タイム", winOnly: false } });
       setTimeout(() => {
         if (st.dead) return;
         GF.showResult({
           win, title: win ? "1位！ ゴール！" : place + "位でゴール",
-          text: "タイム " + me.fin.toFixed(2) + "秒（" + laps + "周）",
+          text: "タイム " + me.fin.toFixed(2) + "秒" + (closed ? "（" + laps + "周）" : "") + (me.pen ? "　ペナルティ +" + me.pen + "秒ふくむ" : "") + (R.resultNote ? R.resultNote(ctx) : ""),
           onRetry: () => { stopAll(st); start(Object.assign({}, opts, { diff, laps })); }
         });
       }, 900);
@@ -852,10 +1051,12 @@
         const n = 3 - Math.floor(cd);
         if (st._cdn !== n) { st._cdn = n; if (n >= 0) FX.SFX.countdown(n); }
         cdEl.textContent = n > 0 ? String(n) : (cd < 3.15 ? "GO!" : "");
-        if (cd >= 3) { st.go = true; raced = 0; st.engine.start(); cdEl.textContent = ""; }
+        if (cd >= 3) { st.go = true; raced = 0; if (!R.quiet) st.engine.start(); cdEl.textContent = ""; }
       }
       if (st.go && !st.done) raced += dt0;
+      if (R.draft && st.go) stepDraft(dt0);
       racers.forEach((r) => { if (!r.me) cpu(r, dt0); stepRacer(r, dt0, st.go && !st.done); });
+      if (hooks && hooks.step) hooks.step(dt0);
       pickBoxes(dt0); stepHazards(dt0); rank(); fx3.step(dt0); shake.step(dt0);
       if (cheerT > 0) { cheerT -= dt0; if (cheerT <= 0) cheer.hidden = true; }
       if (finalT > 0) { finalT -= dt0; if (finalT <= 0) finalEl.hidden = true; }
@@ -870,11 +1071,17 @@
       if (st.engine && st.go) st.engine.set(Math.min(1, Math.abs(me.speed) / veh.boostMax), me.boost > 0 ? 0.045 : 0.03);
       overlay.step(dt0, Math.min(1, Math.max(0, me.speed) / veh.boostMax));
       hudPos.textContent = me.place + "位";
-      hudLap.textContent = "LAP " + Math.min(laps, me.lap + 1) + "/" + laps;
-      hudTime.textContent = (st.done ? me.fin : raced).toFixed(2);
-      const mt = me.charge;
-      hudMt.style.width = Math.min(100, (mt / veh.mt2) * 100) + "%";
-      hudMt.style.background = mt >= veh.mt2 ? "#ff922b" : (mt >= veh.mt1 ? "#74c0fc" : "rgba(255,255,255,.55)");
+      hudLap.textContent = closed ? "LAP " + Math.min(laps, me.lap + 1) + "/" + laps : "ゴールまで " + Math.max(0, Math.round((FIN_T - me.t) * curveLen)) + "m";
+      hudTime.textContent = (st.done ? me.fin : raced + me.pen).toFixed(2) + (me.pen ? "（+" + me.pen + "）" : "");
+      if (ACT === "drift") {
+        const mt = me.charge;
+        hudMt.style.width = Math.min(100, (mt / veh.mt2) * 100) + "%";
+        hudMt.style.background = mt >= veh.mt2 ? "#ff922b" : (mt >= veh.mt1 ? "#74c0fc" : "rgba(255,255,255,.55)");
+      } else {
+        const g = ACT === "spurt" ? me.stam : ACT === "nitro" ? me.nitro : Math.min(1, Math.max(0, me.speed) / (veh.max * 1.12));
+        hudMt.style.width = Math.round(g * 100) + "%";
+        hudMt.style.background = ACT === "nitro" ? "#74c0fc" : ACT === "spurt" ? (g < 0.25 ? "#ff6b6b" : "#69db7c") : (me.spurt ? "#ffe066" : "rgba(255,255,255,.55)");
+      }
       if (st.t * 8 % 1 < dt0 * 8) drawMap();
       renderer.render(scene, camera);
       st.raf = requestAnimationFrame(loop);
@@ -888,19 +1095,21 @@
   function start(opts) {
     const GF = window.GF;
     const diff = opts.diff || "normal";
-    const laps = clampLaps(opts.laps != null ? opts.laps : (window.HMRace3d && HMRace3d.pendingLaps));
+    const sprint = !!(opts.race && opts.race.sprint);
+    const laps = sprint ? 1 : clampLaps(opts.laps != null ? opts.laps : (window.HMRace3d && HMRace3d.pendingLaps));
     opts = Object.assign({}, opts, { laps });
     let cancelled = false;
-    const body = GF.openLayer((opts.title || "カート") + "（" + GF.diffName(diff) + "・" + laps + "周）", () => {
+    const body = GF.openLayer((opts.title || "カート") + "（" + GF.diffName(diff) + (sprint ? "" : "・" + laps + "周") + "）", () => {
       cancelled = true;
       if (window.__R3D && !window.__R3D.dead) stopAll(window.__R3D);
     });
     body.innerHTML = '<div class="r3d-wait">コースを用意しているよ…</div>';
+    const fb = opts.fallback || prevKart;
     loadThree().then((T) => {
       if (!cancelled) boot(T, body, opts, diff);
     }).catch((err) => {
       console.error(err);
-      if (!cancelled && prevKart) prevKart(diff);
+      if (!cancelled && fb) fb(diff);
     });
   }
 
@@ -909,5 +1118,17 @@
     d: "学園のサーキットを3Dで走るよ。すすむ・とまる・左右で操作して、ドリフトとアイテムで1位をめざそう。"
   }, (diff) => start({ id: "kart", title: "カート", vehicle: "kart", theme: "campus", items: true, drift: true, diff, laps: (window.HMRace3d && HMRace3d.pendingLaps) || DEFAULT_LAPS }));
 
-  window.HMRace3d = { start, loadThree, screenSteer, camRightXZ, clampLaps, VEHICLES, THEMES, ITEM_NAMES, DEFAULT_LAPS, RACERS, ROAD_W, pendingLaps: DEFAULT_LAPS };
+  // 3Dレースの登録。周回のあるレースだけ、モード選択で「2周・3周」をえらべる
+  const LAPS_IDS = { kart: 1 };
+  function register(def) {
+    const prev = (window.GCGames && GCGames.open && GCGames.open[def.id]) || null;
+    if (!def.race || !def.race.sprint) LAPS_IDS[def.id] = 1;
+    H.add({ id: def.id, e: def.e, n: def.n, c: def.c, genre: "race", fresh: true, pro: true, d: def.d }, (diff) => start({
+      id: def.id, title: def.title || def.n, vehicle: def.vehicle, theme: def.theme, race: def.race, diff,
+      laps: (window.HMRace3d && HMRace3d.pendingLaps) || DEFAULT_LAPS, fallback: prev
+    }));
+  }
+  const hasLaps = (id) => !!LAPS_IDS[id];
+  window.HMRace3d = { start, loadThree, screenSteer, camRightXZ, clampLaps, register, hasLaps, VEHICLES, THEMES, ITEM_NAMES, DEFAULT_LAPS, RACERS, ROAD_W, FIN_T, pendingLaps: DEFAULT_LAPS,
+    kit: { G, canvasTex, signTex, makeTree, roadGeom, plateTex, buildKart } };
 })();
