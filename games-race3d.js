@@ -40,7 +40,7 @@
     loadP = import(THREE_URL).then((m) => { THREE = m; return m; });
     return loadP;
   }
-  function skillOf(diff) { return { easy: 0.82, normal: 0.92, hard: 0.98, ultra: 1.03 }[diff] || 0.92; }
+  function skillOf(diff) { return { easy: 0.78, normal: 0.93, hard: 1.0, ultra: 1.05 }[diff] || 0.92; }
   function clampLaps(n) { n = +n; return n === 3 ? 3 : 2; }
 
   // 画面の右と、カートの右が同じ向きならそのまま。カメラが正面に回って逆向きなら符号を反転する。
@@ -1088,7 +1088,7 @@
       st.fps = fpsE;
     }
     st.raf = requestAnimationFrame(loop);
-    window.__R3D = st;
+    st.scene = scene; window.__R3D = st;
     return st;
   }
 

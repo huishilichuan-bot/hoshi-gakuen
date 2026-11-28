@@ -94,7 +94,7 @@
       if (postEvery && i % postEvery === 0) posts.push({ x: p.x + sd.x * off, y: p.y + y / 2, z: p.z + sd.z * off, sy: y });
     }
     const c2 = new T.CatmullRomCurve3(pts, closed);
-    const tube = new T.Mesh(new T.TubeGeometry(c2, n * 2, rad, 5, closed), lam(T, col));
+    const tube = new T.Mesh(new T.TubeGeometry(c2, n, rad, 4, closed), lam(T, col));
     scene.add(tube);
     if (posts.length) inst(T, scene, G(T, "rpost", () => new T.BoxGeometry(0.1, 1, 0.1)), lam(T, postCol || col), posts);
     return tube;
@@ -140,14 +140,17 @@
   }
 
   // ---------- 乗り物 ----------
-  function base(T) { const root = new T.Group(), body = new T.Group(); body.name = "body"; root.add(body); return { root, body }; }
+  let curT = null;
+  function base(T) { curT = T; const root = new T.Group(), body = new T.Group(); body.name = "body"; root.add(body); return { root, body }; }
+  // 第10回：同じグループの部品を1つのメッシュにまとめて、描く回数を減らす（動くグループはそのまま動く）
+  function lighten(T, root) { const K = window.HM3D && window.HM3D.k; if (K && K.bakeTree && T) { try { K.bakeTree(T, root); } catch (e) { /* まとめられなくても、そのまま動く */ } } return root; }
   function flamesAt(T, body, list, col) {
     return list.map(([x, y, z, s]) => {
       const fl = new T.Mesh(G(T, "fl" + (s || 1), () => new T.ConeGeometry(0.09 * (s || 1), 0.42 * (s || 1), 6)), new T.MeshBasicMaterial({ color: col || 0x74c0fc, transparent: true, opacity: 0, depthWrite: false }));
       fl.position.set(x, y, z); fl.rotation.x = -Math.PI / 2; body.add(fl); return fl;
     });
   }
-  function finish(root, body, o) { root.userData = Object.assign({ body, wheels: [], flames: [] }, o); return root; }
+  function finish(root, body, o) { lighten(curT, root); root.userData = Object.assign({ body, wheels: [], flames: [] }, o); return root; }
   const lights = (T, body, z, y, xs, col) => xs.forEach((x) => box(T, body, 0.16, 0.08, 0.04, 0, x, y, z, bas(T, col)));
 
   // 車（ラリー・ハイウェイ・ドリフト）
@@ -367,7 +370,7 @@
       const d = new T.Group(); d.position.set(x, 0, z); body.add(d);
       box(T, d, 0.26, 0.24, 0.62, c, 0, 0.42, 0); box(T, d, 0.22, 0.22, 0.26, c, 0, 0.6, 0.36); box(T, d, 0.12, 0.1, 0.16, 0xf8f9fa, 0, 0.55, 0.52);
       cone(T, d, 0.05, 0.12, 4, c, -0.07, 0.75, 0.36); cone(T, d, 0.05, 0.12, 4, c, 0.07, 0.75, 0.36);
-      const tail = box(T, d, 0.06, 0.06, 0.26, c, 0, 0.58, -0.38); tail.rotation.x = -0.8;
+      const tail = box(T, d, 0.06, 0.06, 0.26, c, 0, 0.58, -0.38); tail.rotation.x = -0.8; tail.userData.keep = true;
       box(T, d, 0.28, 0.06, 0.2, acc, 0, 0.56, 0.05);
       const legs = [[-0.09, 0.22], [0.09, 0.22], [-0.09, -0.22], [0.09, -0.22]].map(([lx, lz]) => { const l = new T.Group(); l.position.set(lx, 0.34, lz); d.add(l); box(T, l, 0.07, 0.32, 0.07, c, 0, -0.16, 0); return l; });
       dogs.push({ d, legs, tail }); return d;
@@ -447,7 +450,7 @@
     else if (kind === "hay") { const m = cyl(T, g, 0.6, 0.6, 1.2, 10, 0xe9c46a, 0, 0.6, 0); m.rotation.z = Math.PI / 2; cyl(T, g, 0.62, 0.62, 0.1, 10, 0xc4a26a, 0.3, 0.6, 0).rotation.z = Math.PI / 2; }
     else if (kind === "snowman") { sph(T, g, 0.55, 0xffffff, 0, 0.5, 0); sph(T, g, 0.38, 0xffffff, 0, 1.2, 0); cone(T, g, 0.06, 0.3, 6, 0xff922b, 0, 1.22, 0.42).rotation.x = Math.PI / 2; box(T, g, 0.5, 0.1, 0.5, 0x212529, 0, 1.55, 0); box(T, g, 0.3, 0.3, 0.3, 0x212529, 0, 1.72, 0); }
     else if (kind === "log") { const m = cyl(T, g, 0.32, 0.32, 3.0, 8, 0x8b5a2b, 0, 0.32, 0); m.rotation.z = Math.PI / 2; }
-    return g;
+    return lighten(T, g);
   }
 
   // ---------- コースの形 ----------
@@ -592,9 +595,9 @@
       const ct = along(at, 50, RW + 6, RW + 26, 101).map((o) => ({ x: o.x, y: o.y + 1.3 + (o.r() < 0.3 ? 2.6 : 0), z: o.z, ry: o.yaw + (o.r() < 0.5 ? 0 : Math.PI / 2) }));
       inst(T, scene, G(T, "cont", () => new T.BoxGeometry(2.6, 2.6, 6)), new T.MeshLambertMaterial({ color: 0xffffff }), ct, [0xe03131, 0x1971c2, 0xf08c00, 0x2b8a3e, 0x5f3dc4, 0x868e96]);
       // タイヤの壁（低ポリの円柱を2段、白いタイヤをときどき入れる）
-      const tires = []; const L = curve.getLength(), n = Math.round(L / 1.15);
+      const tires = []; const L = curve.getLength(), n = Math.round(L / 1.3);
       for (let i = 0; i < n; i++) [-1, 1].forEach((s) => { const a = at(i / n, s * (RW + 0.9)); tires.push({ x: a.x, y: 0.2, z: a.z }); tires.push({ x: a.x, y: 0.58, z: a.z }); });
-      inst(T, scene, G(T, "tireC", () => new T.CylinderGeometry(0.5, 0.5, 0.36, 8)), lam(T, 0xffffff), tires, [0x2b2d33, 0x2b2d33, 0xf1f3f5, 0x2b2d33, 0x2b2d33, 0xe03131]);
+      inst(T, scene, G(T, "tireC", () => new T.CylinderGeometry(0.56, 0.56, 0.36, 6)), lam(T, 0xffffff), tires, [0x2b2d33, 0x2b2d33, 0xf1f3f5, 0x2b2d33, 0x2b2d33, 0xe03131]);
       [0.3, 0.7].forEach((tt, i) => { const a = at(tt, (i ? -1 : 1) * (RW + 22)); const cr = new T.Group(); [-2, 2].forEach((x) => [-2, 2].forEach((z) => box(T, cr, 0.5, 18, 0.5, 0xf08c00, x, 9, z))); box(T, cr, 5, 1.2, 26, 0xf08c00, 0, 18, 6); box(T, cr, 3, 2.4, 3, 0x495057, 0, 16, 0); cr.position.set(a.x, 0, a.z); cr.rotation.y = a.yaw; scene.add(cr); });
       lamps(T, scene, at, RW, 18);
       const sea = new T.Mesh(new T.PlaneGeometry(500, 140), lam(T, 0x1864ab)); sea.rotation.x = -Math.PI / 2; sea.position.set(0, -0.3, 140); scene.add(sea);
