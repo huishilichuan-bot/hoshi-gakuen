@@ -104,7 +104,7 @@
       const EMAX = { easy: 0.2, normal: 0.15, hard: 0.115, ultra: 0.09 }[ctx.diff] || 0.15; // タイミングの許せる幅（秒）
       const WU = 1.35; // ピッチャーのモーション（この間に予告マーカーが出ている）
       const TT = { easy: 1.5, normal: 1.0, hard: 0.85, ultra: 0.72 }[ctx.diff] || 1.0; // リリースからミットまで（ストレートの秒数）
-      const MK_R = { easy: 0.07, normal: 0.085, hard: 0.115, ultra: 0.15 }[ctx.diff] || 0.085, MK_OFF = { easy: 0, normal: 0.02, hard: 0.04, ultra: 0.065 }[ctx.diff] || 0.02; // 予告マーカーの大きさ・ずれ（強いほどぼんやり）
+      const MK_R = { easy: 0.1, normal: 0.115, hard: 0.14, ultra: 0.17 }[ctx.diff] || 0.115, MK_OFF = { easy: 0, normal: 0.02, hard: 0.04, ultra: 0.065 }[ctx.diff] || 0.02; // 予告マーカーの大きさ・ずれ（強いほどぼんやり）
       const ZONE = { x0: -0.25, x1: 0.25, y0: 0.5, y1: 1.12 }, CZ = 0.35;
       const zoneG = new T.Group(); zoneG.position.set(0, 0, CZ); scene.add(zoneG);
       const zl = new T.LineSegments(new T.EdgesGeometry(new T.PlaneGeometry(ZONE.x1 - ZONE.x0, ZONE.y1 - ZONE.y0)), new T.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 }));
@@ -115,7 +115,7 @@
       const fillM = new T.Mesh(new T.CircleGeometry(RC, 32), new T.MeshBasicMaterial({ color: 0xffe066, transparent: true, opacity: 0.16, side: T.DoubleSide, depthTest: false, depthWrite: false })); cur.add(fillM);
       const dot = new T.Mesh(new T.CircleGeometry(0.018, 12), new T.MeshBasicMaterial({ color: 0xff6b6b, side: T.DoubleSide, depthTest: false })); cur.add(dot);
       ring.renderOrder = fillM.renderOrder = dot.renderOrder = 10;
-      const markTex = KIT.canvasTex(T, 128, 128, (c) => { const gr = c.createRadialGradient(64, 64, 4, 64, 64, 62); gr.addColorStop(0, "rgba(90,170,255,.75)"); gr.addColorStop(0.55, "rgba(90,170,255,.55)"); gr.addColorStop(0.8, "rgba(150,210,255,.9)"); gr.addColorStop(1, "rgba(116,192,252,0)"); c.fillStyle = gr; c.fillRect(0, 0, 128, 128); });
+      const markTex = KIT.canvasTex(T, 128, 128, (c) => { const gr = c.createRadialGradient(64, 64, 4, 64, 64, 62); gr.addColorStop(0, "rgba(40,130,255,.85)"); gr.addColorStop(0.6, "rgba(40,130,255,.65)"); gr.addColorStop(0.82, "rgba(190,230,255,.95)"); gr.addColorStop(1, "rgba(116,192,252,0)"); c.fillStyle = gr; c.fillRect(0, 0, 128, 128); });
       const mark = new T.Mesh(new T.PlaneGeometry(MK_R * 2, MK_R * 2), new T.MeshBasicMaterial({ map: markTex, transparent: true, opacity: 0, side: T.DoubleSide, depthTest: false, depthWrite: false })); mark.renderOrder = 9; zoneG.add(mark);
       // 画面を指でなぞる／マウスでカーソルを動かす（ストライクゾーンの面に当てる）
       const dom = ctx.renderer.domElement; dom.style.touchAction = "none";
@@ -215,7 +215,7 @@
             pitcher.armR.rotation.x = k < 0.7 ? lerp(0, 2.6, k / 0.7) : lerp(2.6, -1.2, (k - 0.7) / 0.3); pitcher.torso.rotation.y = k < 0.7 ? lerp(0, 0.6, k / 0.7) : lerp(0.6, -0.4, (k - 0.7) / 0.3);
             // 投げ始めたらすぐ、球が来る場所に青いぼかし丸を出す（ミットに届く 2 秒以上前）
             mark.position.set(pitch.mk.x, pitch.mk.y, 0.01);
-            mark.material.opacity = Math.min(0.85, tPhase * 3) * (0.8 + 0.2 * Math.sin(t * 6));
+            mark.material.opacity = Math.min(0.95, tPhase * 3) * (0.85 + 0.15 * Math.sin(t * 6));
             // 球はピッチャーの右手にもったまま見える
             if (pitcher.armR.userData.hand) { pitcher.armR.userData.hand.getWorldPosition(handV); ball.position.copy(handV); ball.visible = true; ball.scale.setScalar(3.7); }
             if (tPhase >= WU) { phase = "pitch"; tPhase = 0; ball.visible = true; if (pitcher.armR.userData.hand) { pitch.p0.copy(ball.position); solve(pitch); } S.throwS(); ctx.say(pitch.ty.n + " " + pitch.kmh + "km/h", 1.2); }
@@ -224,7 +224,7 @@
             posAt(pitch, pitch.t, ball.position); ball.rotation.x += dt * 30; ball.scale.setScalar(1.5 + 2.2 * clamp(ball.position.z / 17, 0, 1));
             pitcher.armR.rotation.x = lerp(pitcher.armR.rotation.x, 0, dt * 4); pitcher.legL.rotation.x *= 0.9; pitcher.torso.rotation.y *= 0.9;
             // 予告マーカーはそのまま（球が来る場所）。ミットに近づくと少し濃く
-            mark.material.opacity = 0.65 + 0.2 * (pitch.t / pitch.Tt);
+            mark.material.opacity = 0.8 + 0.15 * (pitch.t / pitch.Tt);
             // 軌跡
             for (let i = trail.length - 1; i > 0; i--) { trail[i].position.copy(trail[i - 1].position); trail[i].visible = trail[i - 1].visible; }
             trail[0].position.copy(ball.position); trail[0].visible = true;
