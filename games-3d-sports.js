@@ -24,8 +24,8 @@
   HM3D.register({
     id: "baseball", e: "⚾", n: "ホームランバッター", c: "#2e8b57", genre: "sports",
     title: "ホームランバッター",
-    d: "3Dの球場でバッターになるよ。矢印でミートカーソル（丸）を動かして、ボールに合わせて「打つ」。10球で相手チームより多く点をとれば勝ち。",
-    help: "←↑↓→ でミートカーソル（丸）を動かす<br>ボールが来たら「打つ」（スペース）",
+    d: "3Dの球場でバッターになるよ。画面を指でなぞってミートカーソル（丸）を動かし、投げる前に出る青い丸（球が来る場所）を目印に、ボールに合わせて「打つ」。球はぜんぶストライク。10球で相手チームより多く点をとれば勝ち。",
+    help: "指でなぞって（矢印キーでも）ミートカーソル（丸）を動かす<br>投げる前に出る青い丸が、球の来る場所<br>ボールが来たら「打つ」（スペース／画面をタップ）",
     arrows: "cross", buttons: [{ k: "a", label: "打つ", cls: "go big" }],
     sky: 0x8fc4ff, fogNear: 120, fogFar: 320, far: 400, fov: 50, countdown: false,
     setup(ctx) {
@@ -81,24 +81,30 @@
       const batM = cyl(T, bat, 0.035, 0.022, 0.86, 8, 0xd9a066, 0, 0.43, 0); cyl(T, bat, 0.024, 0.024, 0.12, 8, 0x212529, 0, 0.02, 0);
       bakeTree(T, batter.g);
       // 構え（バットを立てる）→ スイング
+      const ease = (x) => x * x * (3 - 2 * x);
+      // s: -0.35〜0=テイクバック（ためる）, 0=構え, 1=打つ瞬間, 1.6=フォロースルー
+      // 腰 → 体幹 → 腕とバット の順に回る（ずらして動かすと自然に見える）
       const batPose = (s) => {
-        // s: 0=構え, 1=打つ瞬間, 1.6=フォロー
-        const k = clamp(s, 0, 1.6);
-        batter.torso.rotation.y = lerp(0.5, -1.6, Math.min(1, k)) + (k > 1 ? -(k - 1) * 0.9 : 0);
-        bat.rotation.set(lerp(-0.35, -1.5, Math.min(1, k * 1.2)), 0, lerp(0.5, 1.57, Math.min(1, k)));
-        batter.armL.rotation.set(lerp(-1.4, -1.5, k), 0, lerp(0.6, 0.1, Math.min(1, k)));
-        batter.armR.rotation.set(lerp(-1.6, -1.3, k), 0, lerp(-0.3, -0.1, Math.min(1, k)));
-        batter.armL.userData.el.rotation.x = lerp(-1.2, -0.2, Math.min(1, k)); batter.armR.userData.el.rotation.x = lerp(-1.5, -0.3, Math.min(1, k));
-        batter.legL.rotation.x = lerp(-0.25, 0.2, Math.min(1, k)); batter.legR.rotation.x = lerp(0.2, -0.1, Math.min(1, k));
-        batter.hip.rotation.y = lerp(0.2, -0.5, Math.min(1, k));
+        const ld = clamp(-s, 0, 0.35) / 0.35, k = clamp(s, 0, 1.6);
+        const hipK = ease(clamp(k / 0.55, 0, 1)), bodyK = ease(clamp((k - 0.12) / 0.6, 0, 1)), armK = ease(clamp((k - 0.22) / 0.62, 0, 1)), fol = ease(clamp((k - 1) / 0.6, 0, 1));
+        batter.hip.rotation.y = lerp(0.2, -0.5, hipK) + ld * 0.3 - fol * 0.25;
+        batter.torso.rotation.y = lerp(0.5, -1.6, bodyK) + ld * 0.4 - fol * 0.6;
+        bat.rotation.set(lerp(-0.35, -1.5, armK) - fol * 0.15, 0, lerp(0.5, 1.57, armK) - ld * 0.2 + fol * 0.5);
+        batter.armL.rotation.set(lerp(-1.4, -1.5, armK), 0, lerp(0.6, 0.1, armK));
+        batter.armR.rotation.set(lerp(-1.6, -1.3, armK), 0, lerp(-0.3, -0.1, armK));
+        batter.armL.userData.el.rotation.x = lerp(-1.2, -0.2, armK); batter.armR.userData.el.rotation.x = lerp(-1.5, -0.3, armK);
+        batter.legL.rotation.x = lerp(-0.25, 0.2, hipK) - ld * 0.3; batter.legR.rotation.x = lerp(0.2, -0.1, hipK) + ld * 0.1;
       };
       batPose(0);
       // ---- ボール・カーソル ----
-      const ball = ballMesh(T, 0.07, 0xffffff, "#e03131"); scene.add(ball); ball.visible = false;
+      const ball = ballMesh(T, 0.07, 0xffffff, "#e03131"); ball.scale.setScalar(1.6); scene.add(ball); ball.visible = false;
       const ballSh = softShadow(T, scene, 0.4, 0.4); ballSh.visible = false;
       const trail = []; for (let i = 0; i < 8; i++) { const m = new T.Mesh(G(T, "trl", () => new T.SphereGeometry(0.06, 6, 4)), new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 - i * 0.03, depthWrite: false })); m.visible = false; scene.add(m); trail.push(m); }
       const RC = { easy: 0.2, normal: 0.16, hard: 0.13, ultra: 0.11 }[ctx.diff] || 0.16;
-      const EMAX = { easy: 0.12, normal: 0.095, hard: 0.08, ultra: 0.068 }[ctx.diff] || 0.095;
+      const EMAX = { easy: 0.2, normal: 0.15, hard: 0.115, ultra: 0.09 }[ctx.diff] || 0.15; // タイミングの許せる幅（秒）
+      const WU = 1.35; // ピッチャーのモーション（この間に予告マーカーが出ている）
+      const TT = { easy: 1.5, normal: 1.0, hard: 0.85, ultra: 0.72 }[ctx.diff] || 1.0; // リリースからミットまで（ストレートの秒数）
+      const MK_R = { easy: 0.07, normal: 0.085, hard: 0.115, ultra: 0.15 }[ctx.diff] || 0.085, MK_OFF = { easy: 0, normal: 0.02, hard: 0.04, ultra: 0.065 }[ctx.diff] || 0.02; // 予告マーカーの大きさ・ずれ（強いほどぼんやり）
       const ZONE = { x0: -0.25, x1: 0.25, y0: 0.5, y1: 1.12 }, CZ = 0.35;
       const zoneG = new T.Group(); zoneG.position.set(0, 0, CZ); scene.add(zoneG);
       const zl = new T.LineSegments(new T.EdgesGeometry(new T.PlaneGeometry(ZONE.x1 - ZONE.x0, ZONE.y1 - ZONE.y0)), new T.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 }));
@@ -109,13 +115,26 @@
       const fillM = new T.Mesh(new T.CircleGeometry(RC, 32), new T.MeshBasicMaterial({ color: 0xffe066, transparent: true, opacity: 0.16, side: T.DoubleSide, depthTest: false, depthWrite: false })); cur.add(fillM);
       const dot = new T.Mesh(new T.CircleGeometry(0.018, 12), new T.MeshBasicMaterial({ color: 0xff6b6b, side: T.DoubleSide, depthTest: false })); cur.add(dot);
       ring.renderOrder = fillM.renderOrder = dot.renderOrder = 10;
-      const mark = new T.Mesh(new T.RingGeometry(0.05, 0.075, 20), new T.MeshBasicMaterial({ color: 0x74c0fc, transparent: true, opacity: 0, side: T.DoubleSide, depthTest: false })); mark.renderOrder = 9; zoneG.add(mark);
+      const markTex = KIT.canvasTex(T, 128, 128, (c) => { const gr = c.createRadialGradient(64, 64, 4, 64, 64, 62); gr.addColorStop(0, "rgba(90,170,255,.75)"); gr.addColorStop(0.55, "rgba(90,170,255,.55)"); gr.addColorStop(0.8, "rgba(150,210,255,.9)"); gr.addColorStop(1, "rgba(116,192,252,0)"); c.fillStyle = gr; c.fillRect(0, 0, 128, 128); });
+      const mark = new T.Mesh(new T.PlaneGeometry(MK_R * 2, MK_R * 2), new T.MeshBasicMaterial({ map: markTex, transparent: true, opacity: 0, side: T.DoubleSide, depthTest: false, depthWrite: false })); mark.renderOrder = 9; zoneG.add(mark);
+      // 画面を指でなぞる／マウスでカーソルを動かす（ストライクゾーンの面に当てる）
+      const dom = ctx.renderer.domElement; dom.style.touchAction = "none";
+      const ray = new T.Raycaster(), ndc = new T.Vector2(), zPlane = new T.Plane(new T.Vector3(0, 0, 1), -CZ), hitV = new T.Vector3();
+      let tapSwing = false, ptr = null;
+      const aimAt = (e) => { const r = dom.getBoundingClientRect(); if (!r.width) return; ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); camera.updateMatrixWorld(); ray.setFromCamera(ndc, camera); if (ray.ray.intersectPlane(zPlane, hitV)) { cu = clamp(-hitV.x, -0.7, 0.7); cv = clamp(hitV.y, 0.1, 1.7); } };
+      const offUI = (e) => !!(e.target && e.target.closest && e.target.closest("button,[data-hold]"));
+      const onPD = (e) => { if (offUI(e)) return; ptr = { id: e.pointerId, t0: performance.now(), x0: e.clientX, y0: e.clientY, moved: false }; aimAt(e); if (e.pointerType === "mouse") tapSwing = true; };
+      const onPM = (e) => { if (ptr && ptr.id === e.pointerId) { if (Math.hypot(e.clientX - ptr.x0, e.clientY - ptr.y0) > 12) ptr.moved = true; aimAt(e); } else if (e.pointerType === "mouse" && !offUI(e)) aimAt(e); };
+      const onPU = (e) => { if (ptr && ptr.id === e.pointerId) { if (e.pointerType !== "mouse" && !ptr.moved && performance.now() - ptr.t0 < 260) tapSwing = true; ptr = null; } };
+      ctx.body.addEventListener("pointerdown", onPD); ctx.body.addEventListener("pointermove", onPM); ctx.body.addEventListener("pointerup", onPU); ctx.body.addEventListener("pointercancel", onPU);
+      ctx.st.unbind.push(() => { ctx.body.removeEventListener("pointerdown", onPD); ctx.body.removeEventListener("pointermove", onPM); ctx.body.removeEventListener("pointerup", onPU); ctx.body.removeEventListener("pointercancel", onPU); });
+      const handV = new T.Vector3();
       let cu = 0, cv = 0.82; // u は画面の右が＋（世界の x はマイナス）
       // ---- 状態 ----
       const PITCHES = 10;
       const cpuBase = { easy: 3, normal: 5, hard: 7, ultra: 9 }[ctx.diff] || 5;
       const cpu = Math.max(1, cpuBase + Math.floor(Math.random() * 3) - 1);
-      let score = 0, n = 0, hr = 0, hits = 0, phase = "wait", tPhase = 0, swingT = -1, swingS = 0, result = "", pitch = null, fly = null, camMode = 0, joy = 0, combo = 0;
+      let lastSwing = null, score = 0, n = 0, hr = 0, hits = 0, phase = "wait", tPhase = 0, swingT = -1, swingS = 0, result = "", pitch = null, fly = null, camMode = 0, joy = 0, combo = 0;
       const camHome = { p: new T.Vector3(0, 1.62, -3.9), l: new T.Vector3(0, 1.05, 12) };
       camera.position.copy(camHome.p); camera.lookAt(camHome.l);
       const camL = camHome.l.clone();
@@ -133,17 +152,16 @@
         { n: "チェンジアップ", v: 21, ax: 0, ay: -2, w: 1.5 }, { n: "フォーク", v: 26, ax: 0, ay: -7, w: 1.2 }, { n: "シュート", v: 28, ax: -4, ay: 0, w: 1 }
       ];
       const pool = { easy: [0, 0, 3], normal: [0, 0, 1, 3, 2], hard: [0, 1, 2, 3, 4], ultra: [0, 1, 2, 3, 4, 5] }[ctx.diff] || [0, 1, 3];
-      const vMul = { easy: 0.74, normal: 0.86, hard: 0.95, ultra: 1.04 }[ctx.diff] || 0.86;
+      // ぜんぶストライク。球速はゆっくり（弱い＞普通＞強い の順に遅い）。投げる前に予告マーカーが出る
+      function solve(p) { const d = p.p0.distanceTo(p.target); p.v0 = p.target.clone().sub(p.p0).sub(p.a.clone().multiplyScalar(0.5 * p.Tt * p.Tt)).divideScalar(p.Tt); p.kmh = Math.round(d / p.Tt * 3.6 * 1.75); return p; }
       function newPitch() {
         const ty = TYPES[pool[Math.floor(Math.random() * pool.length)]];
-        const inZone = Math.random() < 0.82;
-        const tx = inZone ? rnd(ZONE.x0 + 0.03, ZONE.x1 - 0.03) : (Math.random() < 0.5 ? -1 : 1) * rnd(0.33, 0.45);
-        const tyy = inZone ? rnd(ZONE.y0 + 0.04, ZONE.y1 - 0.04) : rnd(ZONE.y0 - 0.15, ZONE.y1 + 0.12);
+        const tx = rnd(ZONE.x0 + 0.04, ZONE.x1 - 0.04), tyy = rnd(ZONE.y0 + 0.05, ZONE.y1 - 0.05);
         const p0 = new T.Vector3(-0.35, 1.9, 17.3), target = new T.Vector3(tx, tyy, CZ);
-        const v = ty.v * vMul, dist = p0.distanceTo(target), Tt = dist / v;
-        const a = new T.Vector3(ty.ax, -9.8 * 0.5 + ty.ay, 0);
-        const v0 = target.clone().sub(p0).sub(a.clone().multiplyScalar(0.5 * Tt * Tt)).divideScalar(Tt);
-        return { ty, p0, v0, a, Tt, t: 0, target, inZone, kmh: Math.round(v * 3.6 * 1.38) };
+        const Tt = TT * Math.pow(31 / ty.v, 0.4), gs = Math.pow(0.65 / Tt, 2);
+        const a = new T.Vector3(ty.ax * gs, (-9.8 * 0.5 + ty.ay) * gs, 0);
+        const ang = Math.random() * Math.PI * 2, rr = MK_OFF * Math.sqrt(Math.random());
+        return solve({ ty, p0, a, Tt, t: 0, target, inZone: true, mk: { x: tx + Math.cos(ang) * rr, y: tyy + Math.sin(ang) * rr } });
       }
       function posAt(p, t, out) { return out.copy(p.p0).addScaledVector(p.v0, t).addScaledVector(p.a, 0.5 * t * t); }
       const tmp = new T.Vector3();
@@ -166,66 +184,78 @@
         else if (kind === "H") { pts = 1; hits++; combo++; ctx.big("ヒット！", 1.6, "#69db7c"); joy = 0.5; }
         else if (kind === "F") { combo = 0; ctx.big("ファウル", 1.2, "#ced4da"); }
         else if (kind === "OUT") { combo = 0; ctx.big(fly && fly.theta > 0.95 ? "フライでアウト" : fly && fly.theta < 0.17 ? "ゴロでアウト" : "キャッチでアウト", 1.5, "#ff8787"); }
-        else if (kind === "K") { combo = 0; ctx.big("ストライク", 1.2, "#ff8787"); }
-        else if (kind === "B") { ctx.big("ボール", 1.0, "#a5d8ff"); }
+        else if (kind === "K") { combo = 0; ctx.big("空ぶり！", 1.2, "#ff8787"); }
+        else if (kind === "L") { combo = 0; ctx.big("見のがし", 1.2, "#a5d8ff"); }
         score += pts;
         if (pts && combo >= 3) ctx.say(combo + "連続ヒット！ その調子！", 2);
         drawBoard(); hudUp();
       }
       function hudUp() { ctx.hud({ big: score + "点", sub: "のこり " + (PITCHES - n) + "球", sub2: "HR " + hr + "・ヒット " + hits, right: "あいて <b>" + cpu + "</b> 点" }); }
       const log = [];
-      const LBL = { HR: "ホームラン", "2B": "ツーベース", H: "ヒット", F: "ファウル", OUT: "アウト", K: "空ぶり", B: "見のがし" };
+      const LBL = { HR: "ホームラン", "2B": "ツーベース", H: "ヒット", F: "ファウル", OUT: "アウト", K: "空ぶり", L: "見のがし" };
       return {
-        dbg: () => ({ log, phase, n, score, cpu, cu, cv, pitch: pitch && phase === "pitch" ? { t: pitch.t, Tt: pitch.Tt, u: -pitch.target.x, v: pitch.target.y, z: ball.position.z } : null }),
+        dbg: () => ({ log, phase, n, score, cpu, cu, cv, pitch: pitch && phase === "pitch" ? { t: pitch.t, Tt: pitch.Tt, u: -pitch.target.x, v: pitch.target.y, z: ball.position.z, inZone: pitch.inZone } : null,
+          // 予告マーカー（投げる前から出ているか）：lead = マーカーが出てからミットに届くまでの秒数
+          wind: pitch && phase === "windup" ? { t: tPhase, remain: WU - tPhase, Tt: pitch.Tt, lead: WU - tPhase + pitch.Tt, op: mark.material.opacity, u: -mark.position.x, v: mark.position.y, ballOn: ball.visible } : null,
+          mk: { op: mark.material.opacity, x: mark.position.x, y: mark.position.y }, lastSwing }),
         step(dt, t) {
           cheerCrowd(T, stands[(Math.floor(t * 30)) % stands.length], t, joy); joy = Math.max(0, joy - dt * 0.4);
-          // カーソル（画面の右が右。カメラはセンター向きなので世界の x とは逆）
-          if (phase !== "fly" && !(phase === "result" && fly)) { cu = clamp(cu + inp.x() * dt * 1.15, -0.42, 0.42); cv = clamp(cv + inp.y() * dt * 1.15, 0.32, 1.3); }
+          // カーソル：指・マウスで直接動かす（上の onPD/onPM）。矢印キーでも動かせる。画面の右が右（世界の x とは逆）
+          if (phase !== "fly" && !(phase === "result" && fly)) { cu = clamp(cu + inp.x() * dt * 1.15, -0.7, 0.7); cv = clamp(cv + inp.y() * dt * 1.15, 0.1, 1.7); }
           cur.position.set(-cu, cv, 0);
           fielders.forEach((f, i) => { if (!fly) { f.g.position.lerp(f.home, dt * 2); runPose(f, t * 2 + i, 0.05); f.g.rotation.y = Math.PI; } });
           tPhase += dt;
+          if (phase !== "pitch") tapSwing = false;
           if (phase === "wait") {
             hudUp();
-            if (ctx.st.go && tPhase > (n ? 1.0 : 1.6)) { phase = "windup"; tPhase = 0; pitch = newPitch(); swingT = -1; swingS = 0; batPose(0); }
+            if (ctx.st.go && tPhase > (n ? 1.0 : 4.6)) { phase = "windup"; tPhase = 0; pitch = newPitch(); swingT = -1; swingS = -0.01; batPose(0); }
           } else if (phase === "windup") {
-            const k = tPhase / 1.0;
+            const k = tPhase / WU;
             pitcher.legL.rotation.x = -Math.sin(Math.min(1, k) * Math.PI) * 1.2; pitcher.legL.userData.knee.rotation.x = Math.sin(Math.min(1, k) * Math.PI) * 1.3;
             pitcher.armR.rotation.x = k < 0.7 ? lerp(0, 2.6, k / 0.7) : lerp(2.6, -1.2, (k - 0.7) / 0.3); pitcher.torso.rotation.y = k < 0.7 ? lerp(0, 0.6, k / 0.7) : lerp(0.6, -0.4, (k - 0.7) / 0.3);
-            if (tPhase >= 1.0) { phase = "pitch"; tPhase = 0; ball.visible = true; S.throwS(); ctx.say(pitch.ty.n + " " + pitch.kmh + "km/h", 1.2); }
+            // 投げ始めたらすぐ、球が来る場所に青いぼかし丸を出す（ミットに届く 2 秒以上前）
+            mark.position.set(pitch.mk.x, pitch.mk.y, 0.01);
+            mark.material.opacity = Math.min(0.85, tPhase * 3) * (0.8 + 0.2 * Math.sin(t * 6));
+            // 球はピッチャーの右手にもったまま見える
+            if (pitcher.armR.userData.hand) { pitcher.armR.userData.hand.getWorldPosition(handV); ball.position.copy(handV); ball.visible = true; ball.scale.setScalar(3.7); }
+            if (tPhase >= WU) { phase = "pitch"; tPhase = 0; ball.visible = true; if (pitcher.armR.userData.hand) { pitch.p0.copy(ball.position); solve(pitch); } S.throwS(); ctx.say(pitch.ty.n + " " + pitch.kmh + "km/h", 1.2); }
           } else if (phase === "pitch") {
             pitch.t += dt;
-            posAt(pitch, pitch.t, ball.position); ball.rotation.x += dt * 30;
+            posAt(pitch, pitch.t, ball.position); ball.rotation.x += dt * 30; ball.scale.setScalar(1.5 + 2.2 * clamp(ball.position.z / 17, 0, 1));
             pitcher.armR.rotation.x = lerp(pitcher.armR.rotation.x, 0, dt * 4); pitcher.legL.rotation.x *= 0.9; pitcher.torso.rotation.y *= 0.9;
-            // 投げた球が来る場所のしるし（やさしいほど早く出る）
-            const showAt = { easy: 0.25, normal: 0.5, hard: 0.78, ultra: 9 }[ctx.diff] || 0.5;
-            const kk = pitch.t / pitch.Tt;
-            mark.material.opacity = kk > showAt ? Math.min(0.85, (kk - showAt) * 4) : 0; mark.position.set(pitch.target.x, pitch.target.y, 0.01);
+            // 予告マーカーはそのまま（球が来る場所）。ミットに近づくと少し濃く
+            mark.material.opacity = 0.65 + 0.2 * (pitch.t / pitch.Tt);
             // 軌跡
             for (let i = trail.length - 1; i > 0; i--) { trail[i].position.copy(trail[i - 1].position); trail[i].visible = trail[i - 1].visible; }
             trail[0].position.copy(ball.position); trail[0].visible = true;
-            if (inp.hit("a") && swingT < 0) { swingT = pitch.t; S.throwS(); }
-            if (swingT >= 0) { swingS = Math.min(1.6, swingS + dt * 7.5); batPose(swingS); }
-            // 打つ瞬間（スイングから 0.13 秒後）
+            if ((inp.hit("a") || tapSwing) && swingT < 0) { swingT = pitch.t; S.throwS(); }
+            if (swingT >= 0) { swingS = Math.min(1.6, swingS + dt * 7.7); batPose(swingS); } else batPose(-0.35 * ease(clamp(pitch.t / 0.35, 0, 1)) * (1 - clamp((pitch.t - pitch.Tt + 0.3) / 0.3, 0, 1)));
+            // 打つ瞬間（スイングから 0.13 秒後）。タイミング（早い／ジャスト／遅い）とカーソル位置の両方で判定
             if (swingT >= 0 && !pitch.tested && pitch.t >= swingT + 0.13) {
               pitch.tested = true;
-              const zc = ball.position.z, v = pitch.v0.length();
-              const e = (zc - CZ) / v; // ＋なら早い
+              const e = pitch.Tt - pitch.t; // ＋なら早い（秒）、−なら遅い
               const cx = -cu, cy = cv;
-              const dx = pitch.target.x - cx, dy = pitch.target.y - cy, d = Math.hypot(dx, dy);
-              if (!(Math.abs(e) < EMAX && d < RC + 0.045)) log.push("miss e" + e.toFixed(3) + " d" + d.toFixed(3));
-              if (Math.abs(e) < EMAX && d < RC + 0.045) {
-                const q = clamp((1 - d / (RC + 0.045)) * Math.sqrt(1 - Math.abs(e) / EMAX) * 1.08, 0, 1);
+              const dx = pitch.target.x - cx, dy = pitch.target.y - cy, d = Math.hypot(dx, dy), RR = RC + 0.045;
+              const tOK = Math.abs(e) < EMAX, pOK = d < RR;
+              const tm = Math.abs(e) <= EMAX * 0.33 ? "just" : e > 0 ? "early" : "late";
+              lastSwing = { e, d, tm, tOK, pOK };
+              if (!(tOK && pOK)) log.push("miss e" + e.toFixed(3) + " d" + d.toFixed(3));
+              if (tOK && pOK) {
+                let q = clamp((1 - d / RR) * Math.sqrt(1 - Math.abs(e) / EMAX) * 1.08, 0, 1);
+                if (tm === "just" && d < RR * 0.6) q = Math.max(q, 0.9); // ジャスト＋芯はしっかり飛ぶ
+                lastSwing.q = q;
                 ball.position.set(pitch.target.x, pitch.target.y, CZ);
                 hitBall(q, e, -dx * 2, cy - pitch.target.y);
+                ctx.say(tm === "just" ? "ジャスト！" : tm === "early" ? "ちょっと早い" : "ちょっと遅い", 1.0);
                 phase = "fly"; tPhase = 0; mark.material.opacity = 0;
                 return;
               }
+              ctx.say(!tOK ? (e > 0 ? "早すぎ！ もっと引きつけよう" : "遅すぎ！ 球が来たらすぐ振ろう") : "ズレた！ カーソルを青い丸に合わせよう", 1.4);
             }
             if (ball.position.z < -1.2) {
               ball.visible = false; trail.forEach((m) => (m.visible = false)); mark.material.opacity = 0;
               n++;
-              if (swingT >= 0) judge("K"); else judge(pitch.inZone ? "K" : "B");
-              if (swingT < 0 && pitch.inZone) ctx.say("見のがしストライク… 打ってみよう！", 1.5);
+              if (swingT >= 0) judge("K"); else { judge("L"); ctx.say("見のがし！ 青い丸に合わせて「打つ」", 1.5); }
             }
             if (swingT < 0) batPose(Math.max(0, Math.sin(t * 2) * 0.02));
           } else if (phase === "fly") {
@@ -260,7 +290,7 @@
             }
           } else if (phase === "result") {
             if (fly && result !== "OUT") { fly.v.y -= 9.8 * dt; fly.p.addScaledVector(fly.v, dt); if (fly.p.y < 0.07) { fly.p.y = 0.07; fly.v.y *= -0.4; fly.v.x *= 0.8; fly.v.z *= 0.8; } ball.position.copy(fly.p); if (camMode) { camL.lerp(fly.p, dt * 3); camera.lookAt(camL); } }
-            if (tPhase > (result === "HR" ? 2.6 : result === "K" || result === "B" ? 0.9 : 2.0)) {
+            if (tPhase > (result === "HR" ? 2.6 : result === "K" || result === "L" ? 0.9 : 2.0)) {
               fly = null; camMode = 0; ball.visible = false; ballSh.visible = false; trail.forEach((m) => (m.visible = false));
               camera.position.copy(camHome.p); camL.copy(camHome.l); camera.lookAt(camL); batPose(0);
               fielders.forEach((f) => f.g.position.copy(f.home));

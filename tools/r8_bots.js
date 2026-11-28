@@ -5,8 +5,9 @@ window.__R8BOTS = {
   const loop = () => { const s = window.__G3D; if (!s || s.dead) return; const d = s.game.dbg(); requestAnimationFrame(loop);
     if (d.pitch) { const du = d.pitch.u - d.cu + (window.__botErrU || 0), dv = d.pitch.v - d.cv + (window.__botErrV || 0);
       set("ArrowRight", du > 0.02); set("ArrowLeft", du < -0.02); set("ArrowUp", dv > 0.02); set("ArrowDown", dv < -0.02);
-      if (!window.__sw && d.pitch.t >= d.pitch.Tt - 0.13 - 0.016 + (window.__botErrT || 0)) { window.__sw = 1; key(" ", true); setTimeout(() => key(" ", false), 60); } }
-    else { window.__sw = 0; ["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown"].forEach((k) => set(k, false)); } };
+      const fdt = window.__lt != null && d.pitch.t > window.__lt ? d.pitch.t - window.__lt : 0.016; window.__lt = d.pitch.t;
+      if (!window.__sw && d.pitch.t + fdt * 0.5 >= d.pitch.Tt - 0.13 - 0.008 + (window.__botErrT || 0)) { window.__sw = 1; key(" ", true); setTimeout(() => key(" ", false), 60); } }
+    else { window.__sw = 0; window.__lt = null; ["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown"].forEach((k) => set(k, false)); } };
   loop(); })(),
   rally: () => (() => {
   const key = (type, k) => window.dispatchEvent(new KeyboardEvent(type, { key: k, code: k === " " ? "Space" : k, bubbles: true }));
