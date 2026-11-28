@@ -671,12 +671,12 @@
       let si = 2, walkFrom = spot(2), walkTo = spot(2), walkT = 1;
       // ---- パワーゲージ（緑のゾーンつき） ----
       const gw = document.createElement("div");
-      gw.style.cssText = "position:absolute;left:50%;bottom:150px;transform:translateX(-50%);width:min(70vw,320px);height:22px;border-radius:11px;background:rgba(0,0,0,.45);border:2px solid rgba(255,255,255,.8);overflow:hidden;pointer-events:none;z-index:5";
-      const gz = document.createElement("div"); gz.style.cssText = "position:absolute;top:0;bottom:0;background:#40c057;opacity:.9";
-      const gf = document.createElement("div"); gf.style.cssText = "position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#ffd43b,#ff922b);opacity:.85;width:0";
-      const gn = document.createElement("div"); gn.style.cssText = "position:absolute;top:-2px;bottom:-2px;width:4px;background:#fff;left:0";
-      gw.append(gz, gf, gn); ctx.body.appendChild(gw);
-      const ZW = { easy: 0.17, normal: 0.13, hard: 0.1, ultra: 0.08 }[D] || 0.13;
+      gw.style.cssText = "position:absolute;left:50%;bottom:150px;transform:translateX(-50%);width:min(70vw,320px);height:28px;border-radius:14px;background:rgba(0,0,0,.55);border:3px solid rgba(255,255,255,.85);overflow:hidden;pointer-events:none;z-index:5;transition:opacity .15s";
+      const gz = document.createElement("div"); gz.style.cssText = "position:absolute;top:0;bottom:0;background:rgba(64,192,87,.9);border-left:3px solid #fff;border-right:3px solid #fff;box-sizing:border-box;color:#fff;font:bold 14px/22px sans-serif;text-align:center;text-shadow:0 1px 2px #000"; gz.textContent = "★";
+      const gf = document.createElement("div"); gf.style.cssText = "position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#ffd43b,#ff922b);opacity:.5;width:0";
+      const gn = document.createElement("div"); gn.style.cssText = "position:absolute;top:0;bottom:0;width:6px;background:#fff;box-shadow:0 0 4px #000;left:0";
+      gw.append(gf, gz, gn); // 第10回：緑のゾーンを、たまっていく色の上に出して見やすく ctx.body.appendChild(gw);
+      const ZW = { easy: 0.2, normal: 0.13, hard: 0.085, ultra: 0.07 }[D] || 0.13;
       let zc = 0.7;
       const newZone = () => { zc = rnd(0.55, 0.85); gz.style.left = ((zc - ZW / 2) * 100) + "%"; gz.style.width = (ZW * 100) + "%"; };
       newZone();
@@ -765,8 +765,9 @@
             if (tP > 0.35) { phase = "ready"; pw = 0; pdir = 1; tP = 0; newZone(); if (left <= 0) { phase = "end"; finish(); } }
           }
           // ゲージ
-          gf.style.width = (pw * 100) + "%"; gn.style.left = "calc(" + (pw * 100) + "% - 2px)";
-          gw.style.opacity = phase === "ready" ? "1" : "0.35";
+          gf.style.width = (pw * 100) + "%"; gn.style.left = "calc(" + (pw * 100) + "% - 3px)";
+          const inZ = Math.abs(pw - zc) <= ZW / 2; gn.style.background = inZ ? "#b2f2bb" : "#fff"; gw.style.borderColor = inZ ? "#69db7c" : "rgba(255,255,255,.85)";
+          gw.style.opacity = phase === "ready" ? "1" : "0.7";
           // ネットのゆれ
           if (netWob > 0) { netWob = Math.max(0, netWob - dt * 1.5); net.scale.set(1 - netWob * 0.15, 1 + Math.sin(t * 30) * netWob * 0.25, 1 - netWob * 0.15); } else net.scale.set(1, 1, 1);
           ball.position.copy(pos); if (phase === "fly") { ball.rotation.x -= dt * 12; }

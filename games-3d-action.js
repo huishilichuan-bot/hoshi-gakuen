@@ -55,10 +55,12 @@
       });
       const allObs = []; B.forEach((b) => b.obs.forEach((o) => { o.h = b.h; allObs.push(o); }));
       // ---- 見た目：ビル ----
-      const winTex = K.windowsTex ? K.windowsTex(T) : null;
-      const bcols = [0x8e7cc3, 0x6c8ebf, 0xc28b7a, 0x7a9e9f, 0xb59a6d];
-      const wallMs = bcols.map((c) => { const m = new T.MeshLambertMaterial({ color: c }); if (winTex) { m.map = winTex; } return m; });
-      const roofM = lam(T, 0x6b6f76);
+      // 第10回：かべの地を明るく（前は地の色が未指定で黒くなっていた）
+      const winTex = K.windowsTex ? K.windowsTex(T, "#ffffff", "#fff3bf") : null;
+      const wallTex = winTex ? winTex.clone() : null; if (wallTex) { wallTex.needsUpdate = true; wallTex.repeat.set(2, 6); }
+      const bcols = [0xb8a9e3, 0x9cc0ea, 0xf0b9a5, 0xa8d5cf, 0xe6cf9c];
+      const wallMs = bcols.map((c) => { const m = new T.MeshLambertMaterial({ color: c }); if (wallTex) { m.map = wallTex; } return m; });
+      const roofM = lam(T, 0x9aa0a8);
       B.forEach((b, i) => {
         const len = b.z1 - b.z0, cz = (b.z0 + b.z1) / 2;
         const m = new T.Mesh(new T.BoxGeometry(LANE * 3 + 3, 40, len), wallMs[i % wallMs.length]); m.position.set(0, b.h - 20, cz); scene.add(m);
@@ -73,7 +75,7 @@
       });
       // 遠くのビル街・下の道
       const sky = []; for (let i = 0; i < 160; i++) { const s = rr() < 0.5 ? -1 : 1; const sy = 20 + rr() * 45; sky.push({ x: s * (16 + rr() * 60), y: -40 + sy / 2, z: -30 + rr() * (GOAL + 120), sx: 6 + rr() * 8, sy, sz: 6 + rr() * 8 }); }
-      inst(T, scene, new T.BoxGeometry(1, 1, 1), new T.MeshLambertMaterial({ color: 0xffffff, map: winTex || null }), sky, [0x6c5f8d, 0x7b6f9e, 0x5a6b8c, 0x8a6f7d]);
+      inst(T, scene, new T.BoxGeometry(1, 1, 1), new T.MeshLambertMaterial({ color: 0xffffff, map: winTex || null }), sky, [0xa99bd0, 0x9fb3d6, 0xc9a7b6, 0x8fb5c9]);
       flat(T, scene, 300, GOAL + 300, lam(T, 0x3b3f4a), 0, -40, GOAL / 2);
       // ゴール
       const gb = B.find((b) => b.z0 <= GOAL && b.z1 >= GOAL), gh = gb ? gb.h : 0;
@@ -82,7 +84,7 @@
       flat(T, scene, LANE * 3 + 2.6, 1, new T.MeshBasicMaterial({ map: KIT.canvasTex(T, 64, 8, (c) => { for (let i = 0; i < 16; i++) for (let j = 0; j < 2; j++) { c.fillStyle = (i + j) % 2 ? "#fff" : "#111"; c.fillRect(i * 4, j * 4, 4, 4); } }) }), 0, gh + 0.02, GOAL);
       // ---- ランナー ----
       const cols = [me, 0x1c7ed6, 0x2f9e44, 0xf08c00];
-      const BASE = { easy: 6.3, normal: 7.4, hard: 8.1, ultra: 8.6 }[D] || 7.4, STUM = { easy: 0.22, normal: 0.12, hard: 0.07, ultra: 0.04 }[D] || 0.12;
+      const BASE = { easy: 6.6, normal: 8.1, hard: 8.75, ultra: 9.0 }[D] || 8.1, STUM = { easy: 0.22, normal: 0.07, hard: 0.03, ultra: 0.015 }[D] || 0.07;
       const startLi = [1, 0, 2, 1], startZ = [0, -1.5, -1.5, -3];
       const runners = cols.map((c, i) => {
         const a = athlete(T, scene, { shirt: c, pants: 0x212529, band: i ? 0xffffff : 0xffd43b, shoe: 0xffffff, noBake: true }); bakeTree(T, a.g);
@@ -105,7 +107,7 @@
           if (go && !P.fin) {
             if (goR) P.li = Math.min(2, P.li + 1);
             if (goL) P.li = Math.max(0, P.li - 1);
-            if (P.stun <= 0 && P.fall <= 0) P.v = up ? Math.min(VMAX * (0.9 + sk * 0.1), P.v + dt * 7) : Math.max(0, P.v - dt * 10);
+            if (P.stun <= 0 && P.fall <= 0) P.v = up ? Math.min(VMAX, P.v + dt * 7) : Math.max(0, P.v - dt * 10);
             if (jump && P.ground && P.stun <= 0 && P.fall <= 0) { P.vy = JV; P.ground = false; P.slide = 0; FX.SFX.whoosh(); }
             if (sl && P.ground && P.stun <= 0) { P.slide = 0.75; FX.SFX.whoosh(); }
           }
@@ -197,12 +199,28 @@
       // ---- 自機 ----
       const ship = new T.Group(); scene.add(ship);
       const body = new T.Group(); ship.add(body);
-      cone(T, body, 0.42, 2.6, 8, 0xf1f3f5, 0, 0, 0.9).rotation.x = Math.PI / 2;
-      box(T, body, 3.6, 0.12, 1.0, me, 0, -0.05, -0.2); box(T, body, 0.12, 0.7, 0.8, me, 0, 0.35, -0.55);
-      [-1.75, 1.75].forEach((x) => box(T, body, 0.16, 0.4, 1.2, 0xadb5bd, x, 0, -0.1));
-      sph(T, body, 0.2, 0x74c0fc, 0, 0.2, 0.55, null, 10, 8).scale.set(1, 0.7, 1.8);
+      // 第10回：自機をくわしく（胴体・機首・後ろに引いたつばさ・2つのエンジン・キャノピー・翼の先のライト）
+      const hull = 0xe9ecef, dk = 0x495057;
+      cyl(T, body, 0.36, 0.42, 1.8, 10, hull, 0, 0, -0.1).rotation.x = Math.PI / 2;
+      cone(T, body, 0.36, 1.3, 10, hull, 0, 0, 1.45).rotation.x = Math.PI / 2;
+      cone(T, body, 0.12, 0.4, 8, me, 0, 0, 2.15).rotation.x = Math.PI / 2;
+      box(T, body, 0.5, 0.08, 1.2, me, 0, 0.3, 0.2);
+      [-1, 1].forEach((s) => {
+        const w = box(T, body, 1.9, 0.1, 0.95, hull, s * 1.15, -0.06, -0.35); w.rotation.y = s * 0.32;
+        const st = box(T, body, 1.5, 0.11, 0.22, me, s * 1.1, -0.04, -0.12); st.rotation.y = s * 0.32;
+        cyl(T, body, 0.2, 0.24, 1.3, 10, 0xadb5bd, s * 0.62, -0.08, -0.5).rotation.x = Math.PI / 2;
+        cyl(T, body, 0.25, 0.25, 0.14, 10, dk, s * 0.62, -0.08, -1.18).rotation.x = Math.PI / 2;
+        box(T, body, 0.1, 0.32, 0.6, dk, s * 2.0, 0.05, -0.62);
+        const fin = box(T, body, 0.08, 0.6, 0.6, me, s * 0.42, 0.42, -0.75); fin.rotation.z = -s * 0.35;
+        box(T, body, 0.05, 0.05, 0.9, dk, s * 1.95, -0.1, 0.25);
+      });
       bake(T, body, true);
-      const flame = new T.Mesh(new T.ConeGeometry(0.16, 0.9, 8), new T.MeshBasicMaterial({ color: 0xffa94d, transparent: true, opacity: 0.8 })); flame.rotation.x = -Math.PI / 2; flame.position.set(0, 0, -1.2); ship.add(flame);
+      const glassM = new T.MeshLambertMaterial({ color: 0x74c0fc, emissive: 0x1c4f80, transparent: true, opacity: 0.9 });
+      const cp = new T.Mesh(new T.SphereGeometry(0.26, 12, 8), glassM); cp.scale.set(1, 0.75, 2.0); cp.position.set(0, 0.3, 0.7); body.add(cp);
+      [-1, 1].forEach((s) => { const lt = new T.Mesh(new T.SphereGeometry(0.08, 8, 6), new T.MeshBasicMaterial({ color: s < 0 ? 0xff6b6b : 0x69db7c })); lt.position.set(s * 2.05, 0.05, -0.35); body.add(lt); });
+      const flameM = new T.MeshBasicMaterial({ color: 0xffa94d, transparent: true, opacity: 0.85, depthWrite: false });
+      const flame = new T.Group(); ship.add(flame); flame.position.set(0, 0, 0);
+      [-0.62, 0.62].forEach((x) => { const f = new T.Mesh(new T.ConeGeometry(0.2, 1.0, 8), flameM); f.rotation.x = -Math.PI / 2; f.position.set(x, -0.08, -1.75); flame.add(f); const c = new T.Mesh(new T.ConeGeometry(0.1, 0.6, 8), new T.MeshBasicMaterial({ color: 0xfff3bf, transparent: true, opacity: 0.95, depthWrite: false })); c.rotation.x = -Math.PI / 2; c.position.set(x, -0.08, -1.55); flame.add(c); });
       // ---- 物体 ----
       const shots = [], foes = [], eshots = [], items = [];
       const laserGeo = new T.BoxGeometry(0.08, 0.08, 1.6), laserM = new T.MeshBasicMaterial({ color: 0x8ce99a });
@@ -294,7 +312,7 @@
           // 自機
           ship.position.set(x, y, 0); body.rotation.z = -vx * 0.022; body.rotation.x = -vy * 0.02; ship.visible = phase !== "over" || shield > 0 ? (inv > 0 ? (t * 20 | 0) % 2 === 0 : true) : false;
           if (shield <= 0) ship.visible = false;
-          flame.scale.y = 0.8 + Math.sin(t * 40) * 0.2;
+          flame.children.forEach((f, k) => { f.scale.y = 0.8 + Math.sin(t * 40 + k) * 0.22; });
           // レーザー
           for (let i = shots.length - 1; i >= 0; i--) {
             const s = shots[i], z0 = s.z; s.z += 95 * dt; s.x += s.vx * dt; let hit = false;
@@ -560,12 +578,14 @@
         return { g, tur };
       }
       const mkHp = () => { const m = new T.Mesh(new T.PlaneGeometry(1.8, 0.22), new T.MeshBasicMaterial({ color: 0xff6b6b, depthTest: false })); m.renderOrder = 5; scene.add(m); return m; };
-      const player = Object.assign(mkTank(me, 0x1e5e2a), { x: 0, z: -17, h: 0, th: 0, hp: { easy: 7, normal: 5, hard: 4, ultra: 3 }[D] || 5, cd: 0, me: true, v: 0, dead: false });
+      const player = Object.assign(mkTank(me, 0x1e5e2a), { x: 0, z: -17, h: 0, th: 0, hp: { easy: 7, normal: 4, hard: 3, ultra: 3 }[D] || 4, cd: 0, me: true, v: 0, dead: false });
+      // 第10回：弱い・普通・強いの差をはっきり（敵の体力・ねらい補助）
+      const EHP = { easy: 2, normal: 3, hard: 4, ultra: 4 }[D] || 3, AIM = { easy: 0.16, normal: 0.09, hard: 0.05, ultra: 0.035 }[D] || 0.09;
       const ecol = [0x868e96, 0x8a7b52, 0x6c757d];
       const spawns = [[-14, 17], [14, 17], [0, 19]];
-      const enemies = spawns.map(([x, z], i) => Object.assign(mkTank(ecol[i], 0x343a40), { x, z, h: Math.PI, th: Math.PI, hp: 3, cd: 1.5 + i * 0.7, wp: null, stuck: 0, dead: false, bar: mkHp(), aimErr: 0 }));
+      const enemies = spawns.map(([x, z], i) => Object.assign(mkTank(ecol[i], 0x343a40), { x, z, h: Math.PI, th: Math.PI, hp: EHP, cd: (D === "easy" ? 2.5 : 1.2) + i * 0.6, wp: null, stuck: 0, dead: false, bar: mkHp(), aimErr: 0 }));
       const tanks = [player].concat(enemies);
-      const ER = { easy: 2.6, normal: 1.8, hard: 1.35, ultra: 1.05 }[D] || 1.8, EACC = { easy: 0.16, normal: 0.1, hard: 0.06, ultra: 0.035 }[D] || 0.1, ESP = { easy: 2.6, normal: 3.2, hard: 3.8, ultra: 4.3 }[D] || 3.2;
+      const ER = { easy: 2.8, normal: 1.45, hard: 1.0, ultra: 0.8 }[D] || 1.45, EACC = { easy: 0.18, normal: 0.07, hard: 0.035, ultra: 0.02 }[D] || 0.07, ESP = { easy: 2.4, normal: 3.6, hard: 4.4, ultra: 5.0 }[D] || 3.6;
       // ---- 当たり判定 ----
       function inBlock(x, z, r) { if (Math.abs(x) > A - r || Math.abs(z) > A - r) return true; return blocks.some((b) => x > b.x0 - r && x < b.x1 + r && z > b.z0 - r && z < b.z1 + r); }
       function pushOut(t) {
@@ -614,7 +634,7 @@
             player.x += Math.sin(player.h) * player.v * dt; player.z += Math.cos(player.h) * player.v * dt; pushOut(player);
             player.th = player.h;
             // ゆるいねらい補助（8°以内の敵に向ける）
-            let best = null, bd = 0.09; enemies.forEach((e) => { if (e.dead) return; const a = Math.atan2(e.x - player.x, e.z - player.z); let d = a - player.h; d = Math.atan2(Math.sin(d), Math.cos(d)); if (Math.abs(d) < bd && !segHits(player.x, player.z, e.x, e.z)) { bd = Math.abs(d); best = d; } });
+            let best = null, bd = AIM; enemies.forEach((e) => { if (e.dead) return; const a = Math.atan2(e.x - player.x, e.z - player.z); let d = a - player.h; d = Math.atan2(Math.sin(d), Math.cos(d)); if (Math.abs(d) < bd && !segHits(player.x, player.z, e.x, e.z)) { bd = Math.abs(d); best = d; } });
             if (best != null) player.th = player.h + best;
             player.cd -= dt; if (inp.hit("a") && player.cd <= 0) { fire(player); player.cd = 0.55; shotsFired++; }
           } else inp.hit("a");
