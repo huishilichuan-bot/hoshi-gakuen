@@ -4,7 +4,7 @@ import json, os, random, sys, time
 from playwright.sync_api import sync_playwright
 NOAUTH = ("window.__HM_NO_GK = true; Object.defineProperty(window, 'HM_FIREBASE', { configurable: true, get() { return { enabled: false }; }, set() {} }); "
           "try{localStorage.setItem('hoshigakuen:consent',JSON.stringify({v:'2026-11-21',t:1}))}catch(e){} try{localStorage.setItem('hoshigakuen-auth-seen','1')}catch(e){}")
-args = [a for a in sys.argv[1:] if not a.startswith("--")]
+args = [a for i, a in enumerate(sys.argv[1:], 1) if not a.startswith("--") and sys.argv[i - 1] not in ("--secs", "--only")]
 BASE = args[0] if args else "http://127.0.0.1:18473"
 SECS = float(sys.argv[sys.argv.index("--secs") + 1]) if "--secs" in sys.argv else 3.5
 ONLY = sys.argv[sys.argv.index("--only") + 1].split(",") if "--only" in sys.argv else None
@@ -44,6 +44,8 @@ with sync_playwright() as p:
                 if SHOTS: pg.screenshot(path=os.path.join(SHOTS, gid + ".png"))
                 shot = True
         txt += pg.evaluate("document.body.innerText")
+        if gid == "basket":
+            ok("basket: パワーゲージ（緑のゾーン★）が見える", pg.evaluate("() => [...document.querySelectorAll('#gl-body div')].some((d) => d.textContent === '★' && d.offsetWidth > 5 && d.getBoundingClientRect().height > 10)"))
         pg.evaluate("() => { const c = document.getElementById('gl-close'); if (c) c.click(); }"); pg.wait_for_timeout(250)
         e = errs[eb:]
         ok(f"{gid}: エラーなし", not e, e[:2])

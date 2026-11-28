@@ -675,7 +675,7 @@
       const gz = document.createElement("div"); gz.style.cssText = "position:absolute;top:0;bottom:0;background:rgba(64,192,87,.9);border-left:3px solid #fff;border-right:3px solid #fff;box-sizing:border-box;color:#fff;font:bold 14px/22px sans-serif;text-align:center;text-shadow:0 1px 2px #000"; gz.textContent = "★";
       const gf = document.createElement("div"); gf.style.cssText = "position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#ffd43b,#ff922b);opacity:.5;width:0";
       const gn = document.createElement("div"); gn.style.cssText = "position:absolute;top:0;bottom:0;width:6px;background:#fff;box-shadow:0 0 4px #000;left:0";
-      gw.append(gf, gz, gn); // 第10回：緑のゾーンを、たまっていく色の上に出して見やすく ctx.body.appendChild(gw);
+      gw.append(gf, gz, gn); ctx.body.appendChild(gw); // 第10回：緑のゾーンを、たまっていく色の上に出して見やすく
       const ZW = { easy: 0.2, normal: 0.13, hard: 0.085, ultra: 0.07 }[D] || 0.13;
       let zc = 0.7;
       const newZone = () => { zc = rnd(0.55, 0.85); gz.style.left = ((zc - ZW / 2) * 100) + "%"; gz.style.width = (ZW * 100) + "%"; };
