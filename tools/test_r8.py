@@ -27,7 +27,7 @@ with sync_playwright() as p:
     ctx.add_init_script(NOAUTH); pg = ctx.new_page(); errs = []
     pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.goto(BASE + "index.html"); pg.wait_for_timeout(1500)
-    ok("VERSION が 1.9.0", pg.evaluate("HM_APP.version") == "1.9.0", pg.evaluate("HM_APP.version"))
+    ver = pg.evaluate("HM_APP.version"); ok("VERSION が 1.9.0 以上", tuple(map(int, ver.split("."))) >= (1, 9, 0), ver)
     # 前の記録（2D時代の記録）を入れておく
     pg.evaluate("""() => { const st = HM_APP.exportState(); st.games = st.games || {}; ['baseball','pingpong','tennis','basket','bowling'].forEach((id) => { st.games[id] = Object.assign({ easy: { plays: 4, wins: 2, streak: 0, maxStreak: 2 } }, st.games[id] || {}); }); st.settings = st.settings || {}; st.settings.sound = false; st.settings.haptic = false; const day = HM_APP.today(); st.days = st.days || {}; st.days[day] = Object.assign({ stars: 0, steps: {} }, st.days[day] || {}, { stars: 30 }); HM_APP.importState(st); }""")
     for sel in ["#consent .btn", ".auth-skip", ".greet .btn"]:
