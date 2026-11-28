@@ -19,6 +19,159 @@
   }
 
   // =====================================================================
+  // パルクール：ビルの屋上を走ってゴールへ。4人で競走
+  // =====================================================================
+  HM3D.register({
+    id: "parkour", e: "🤸", n: "パルクール", c: "#5f3dc4", genre: "action", title: "パルクール",
+    d: "3Dのビルの屋上を4人で競走！↑を押している間だけ走る。「ジャンプ」でビルのすき間や低いかべを飛びこえ、↓でパイプの下をスライディング。←→で3つのレーンを移動。1位でゴールすれば勝ち。",
+    help: "↑ 押している間だけ走る　←→ でレーン移動<br>「ジャンプ」（スペース）：すき間・低いかべ<br>↓ スライディング：パイプの下をくぐる",
+    arrows: "cross", buttons: [{ k: "a", label: "ジャンプ", cls: "go big" }],
+    sky: 0xffb48a, fogCol: 0xf7b8a0, fogNear: 60, fogFar: 230, far: 320, fov: 62,
+    setup(ctx) {
+      const { T, scene, camera, inp, S, FX } = ctx;
+      const D = ctx.diff, sk = ctx.sk, me = partnerColor(T, 0xe03131);
+      const LANE = 1.7, GOAL = 380, GR = 17, JV = 6.6, VMAX = 9.2;
+      const laneX = (li) => (1 - li) * LANE; // li が大きいほど画面の右（世界の -x）
+      const rr = R01(41 + Math.floor(Math.random() * 1000));
+      // ---- コース ----
+      const B = []; let z = -12, h = 0;
+      for (let guard = 0; z < GOAL + 30 && guard < 60; guard++) {
+        const first = !B.length, len = first ? 46 : 26 + rr() * 22;
+        if (!first) h = clamp(h + (rr() - 0.55) * 2.2, -1.5, 2.5);
+        const b = { z0: z, z1: z + len, h, obs: [] };
+        if (b.z1 > GOAL - 5 && b.z0 < GOAL) b.z1 = Math.max(b.z1, GOAL + 30);
+        B.push(b); z = b.z1 + (b.z1 >= GOAL ? 999 : 2.6 + rr() * 1.8 * sk);
+      }
+      // 障害物
+      B.forEach((b, bi) => {
+        let oz = b.z0 + (bi === 0 ? 18 : 7);
+        for (let guard = 0; oz < Math.min(b.z1 - 6, GOAL - 4) && guard < 20; guard++) {
+          const r = rr(), type = r < 0.42 ? "vent" : r < 0.72 ? "pipe" : "ac";
+          const lanes = type === "ac" ? [Math.floor(rr() * 3)] : type === "vent" && rr() < 0.4 ? (rr() < 0.5 ? [0, 1] : [1, 2]) : [0, 1, 2];
+          if (type === "ac") { const l2 = Math.floor(rr() * 3); if (l2 !== lanes[0] && rr() < 0.5) lanes.push(l2); }
+          b.obs.push({ type, z: oz, lanes, len: type === "pipe" ? 0.5 : type === "ac" ? 1.6 : 0.6, top: type === "vent" ? 0.85 : type === "ac" ? 1.5 : 0 });
+          oz += 9 + rr() * 6;
+        }
+      });
+      const allObs = []; B.forEach((b) => b.obs.forEach((o) => { o.h = b.h; allObs.push(o); }));
+      // ---- 見た目：ビル ----
+      const winTex = K.windowsTex ? K.windowsTex(T) : null;
+      const bcols = [0x8e7cc3, 0x6c8ebf, 0xc28b7a, 0x7a9e9f, 0xb59a6d];
+      const wallMs = bcols.map((c) => { const m = new T.MeshLambertMaterial({ color: c }); if (winTex) { m.map = winTex; } return m; });
+      const roofM = lam(T, 0x6b6f76);
+      B.forEach((b, i) => {
+        const len = b.z1 - b.z0, cz = (b.z0 + b.z1) / 2;
+        const m = new T.Mesh(new T.BoxGeometry(LANE * 3 + 3, 40, len), wallMs[i % wallMs.length]); m.position.set(0, b.h - 20, cz); scene.add(m);
+        flat(T, scene, LANE * 3 + 2.6, len - 0.2, roofM, 0, b.h + 0.01, cz);
+        [-1, 1].forEach((s) => box(T, scene, 0.25, 0.5, len, 0x495057, s * (LANE * 1.5 + 1.3), b.h + 0.25, cz));
+        if (len > 30) cyl(T, scene, 1.2, 1.2, 2, 10, 0x868e96, (i % 2 ? 1 : -1) * (LANE * 1.5 + 2.8), b.h + 1, cz);
+      });
+      allObs.forEach((o) => {
+        if (o.type === "vent") o.lanes.forEach((l) => { box(T, scene, LANE - 0.15, 0.85, 0.6, 0xadb5bd, laneX(l), o.h + 0.425, o.z + 0.3); box(T, scene, LANE - 0.15, 0.08, 0.62, 0xffd43b, laneX(l), o.h + 0.86, o.z + 0.3); });
+        else if (o.type === "pipe") { const m = cyl(T, scene, 0.18, 0.18, LANE * 3 + 2.6, 8, 0xd9480f, 0, o.h + 1.2, o.z + 0.25); m.rotation.z = Math.PI / 2; [-1, 1].forEach((s) => box(T, scene, 0.15, 1.2, 0.15, 0x495057, s * (LANE * 1.5 + 1.1), o.h + 0.6, o.z + 0.25)); }
+        else o.lanes.forEach((l) => { box(T, scene, LANE - 0.2, 1.5, 1.6, 0xdee2e6, laneX(l), o.h + 0.75, o.z + 0.8); cyl(T, scene, 0.45, 0.45, 0.1, 12, 0x495057, laneX(l), o.h + 1.52, o.z + 0.8); });
+      });
+      // 遠くのビル街・下の道
+      const sky = []; for (let i = 0; i < 160; i++) { const s = rr() < 0.5 ? -1 : 1; const sy = 20 + rr() * 45; sky.push({ x: s * (16 + rr() * 60), y: -40 + sy / 2, z: -30 + rr() * (GOAL + 120), sx: 6 + rr() * 8, sy, sz: 6 + rr() * 8 }); }
+      inst(T, scene, new T.BoxGeometry(1, 1, 1), new T.MeshLambertMaterial({ color: 0xffffff, map: winTex || null }), sky, [0x6c5f8d, 0x7b6f9e, 0x5a6b8c, 0x8a6f7d]);
+      flat(T, scene, 300, GOAL + 300, lam(T, 0x3b3f4a), 0, -40, GOAL / 2);
+      // ゴール
+      const gb = B.find((b) => b.z0 <= GOAL && b.z1 >= GOAL), gh = gb ? gb.h : 0;
+      [-1, 1].forEach((s) => cyl(T, scene, 0.15, 0.15, 3.6, 8, 0xffffff, s * (LANE * 1.5 + 0.9), gh + 1.8, GOAL));
+      const gs = new T.Mesh(new T.PlaneGeometry(LANE * 3 + 2, 0.9), new T.MeshBasicMaterial({ map: textTex(T, "GOAL", { w: 256, h: 64, bg: "#e03131", fg: "#fff", fs: 46 }), side: T.DoubleSide })); gs.position.set(0, gh + 3.3, GOAL); gs.rotation.y = Math.PI; scene.add(gs);
+      flat(T, scene, LANE * 3 + 2.6, 1, new T.MeshBasicMaterial({ map: KIT.canvasTex(T, 64, 8, (c) => { for (let i = 0; i < 16; i++) for (let j = 0; j < 2; j++) { c.fillStyle = (i + j) % 2 ? "#fff" : "#111"; c.fillRect(i * 4, j * 4, 4, 4); } }) }), 0, gh + 0.02, GOAL);
+      // ---- ランナー ----
+      const cols = [me, 0x1c7ed6, 0x2f9e44, 0xf08c00];
+      const BASE = { easy: 6.3, normal: 7.4, hard: 8.1, ultra: 8.6 }[D] || 7.4, STUM = { easy: 0.22, normal: 0.12, hard: 0.07, ultra: 0.04 }[D] || 0.12;
+      const startLi = [1, 0, 2, 1], startZ = [0, -1.5, -1.5, -3];
+      const runners = cols.map((c, i) => {
+        const a = athlete(T, scene, { shirt: c, pants: 0x212529, band: i ? 0xffffff : 0xffd43b, shoe: 0xffffff, noBake: true }); bakeTree(T, a.g);
+        return { a, i, me: i === 0, li: startLi[i], x: laneX(startLi[i]), z: startZ[i], y: 0, vy: 0, v: 0, ground: true, slide: 0, stun: 0, fall: 0, fin: 0, ph: rr() * 6, base: BASE * (0.94 + i * 0.03), passed: new Set() };
+      });
+      const P = runners[0];
+      const bAt = (zz) => B.find((b) => zz >= b.z0 && zz <= b.z1) || null;
+      let tAll = 0, phase = "play", tEnd = 0, place = 0;
+      const finishOrder = [], camL = new T.Vector3();
+      function rankOf(r) { return 1 + runners.filter((o) => o !== r && (o.fin ? (!r.fin || o.fin < r.fin) : (!r.fin && o.z > r.z))).length; }
+      function hud() { ctx.hud({ big: P.fin ? "ゴール！" : "のこり " + Math.max(0, Math.ceil(GOAL - P.z)) + " m", sub: rankOf(P) + "位 / 4人", sub2: tAll.toFixed(1) + "秒", right: "", gauge: clamp(P.z / GOAL, 0, 1), gaugeCol: "#ffd43b" }); }
+      function stumble(r, msg) { r.stun = 0.65; r.v = Math.min(r.v, 1); if (r.me) { ctx.shake.add(0.3); FX.SFX.hit(); if (msg) ctx.say(msg, 1); } }
+      hud();
+      return {
+        dbg: () => { const ahead = allObs.filter((o) => o.z > P.z - 0.5 && o.z < P.z + 16).map((o) => ({ type: o.type, z: o.z, lanes: o.lanes })); const b = bAt(P.z); return { phase, z: P.z, y: P.y, li: P.li, v: P.v, ground: P.ground, gapAt: b ? b.z1 : null, ahead, rank: rankOf(P), fin: P.fin }; },
+        step(dt, t) {
+          const go = ctx.st.go && phase !== "end"; if (go && !P.fin) tAll += dt;
+          const up = inp.held.up, jump = inp.hit("a"), sl = inp.hit("down");
+          const goR = inp.hit("right"), goL = inp.hit("left");
+          if (go && !P.fin) {
+            if (goR) P.li = Math.min(2, P.li + 1);
+            if (goL) P.li = Math.max(0, P.li - 1);
+            if (P.stun <= 0 && P.fall <= 0) P.v = up ? Math.min(VMAX * (0.9 + sk * 0.1), P.v + dt * 7) : Math.max(0, P.v - dt * 10);
+            if (jump && P.ground && P.stun <= 0 && P.fall <= 0) { P.vy = JV; P.ground = false; P.slide = 0; FX.SFX.whoosh(); }
+            if (sl && P.ground && P.stun <= 0) { P.slide = 0.75; FX.SFX.whoosh(); }
+          }
+          // CPU
+          runners.forEach((r) => {
+            if (r.me || !go || r.fin) return;
+            if (r.stun <= 0 && r.fall <= 0) r.v = Math.min(r.base * (1 + Math.sin(t * 0.7 + r.i) * 0.04), r.v + dt * 6);
+            for (let k = 0; k < allObs.length; k++) {
+              const o = allObs[k]; if (r.passed.has(k)) continue; const dz = o.z - r.z; if (dz > 9) break;
+              if (o.type === "ac" && dz < 7 && dz > 0 && o.lanes.includes(r.li)) { const c = [0, 1, 2].filter((l) => !o.lanes.includes(l)).sort((a, b) => Math.abs(a - r.li) - Math.abs(b - r.li)); if (c.length) r.li = c[0]; }
+              if (dz < Math.max(1.2, r.v * 0.3) && dz > 0 && r.ground && r.stun <= 0) {
+                r.passed.add(k);
+                if (Math.random() < STUM && o.type !== "ac") { stumble(r); continue; }
+                if (o.type === "vent" && o.lanes.includes(r.li)) { r.vy = JV; r.ground = false; }
+                if (o.type === "pipe") r.slide = 0.75;
+              }
+            }
+            const b = bAt(r.z); if (b && r.ground && b.z1 - r.z < Math.max(1.2, r.v * 0.3) && b.z1 - r.z > 0 && b.z1 < GOAL) { r.vy = JV; r.ground = false; }
+          });
+          // 物理
+          runners.forEach((r) => {
+            r.stun = Math.max(0, r.stun - dt); r.slide = Math.max(0, r.slide - dt);
+            if (r.fall > 0) { r.fall -= dt; r.vy -= GR * dt; r.y += r.vy * dt; if (r.fall <= 0) { const nb = B.find((b) => b.z0 > r.z - 1) || B[B.length - 1]; r.z = nb.z0 + 1.2; r.y = nb.h; r.vy = 0; r.ground = true; r.v = 0; r.stun = 0.3; } return; }
+            r.x = lerp(r.x, laneX(r.li), Math.min(1, dt * 10));
+            const z0 = r.z; r.z += r.v * dt;
+            const nb = B.find((bb) => z0 < bb.z0 && r.z >= bb.z0);
+            if (nb && r.y < nb.h - 0.35) { r.z = nb.z0 - 0.3; r.v = 0; }
+            r.vy -= GR * dt; r.y += r.vy * dt;
+            const b2 = bAt(r.z), gy = b2 ? b2.h : -100;
+            if (r.y <= gy && r.vy <= 0 && r.y > gy - 0.6) { r.y = gy; r.vy = 0; r.ground = true; }
+            else if (r.y > gy + 0.02) r.ground = false;
+            if (r.y < (b2 ? b2.h - 3 : -4) && r.fall <= 0) { r.fall = 1.0; if (r.me) { ctx.big("落ちた！", 1, "#ff8787"); ctx.say("ちょっと先からやり直し", 1.2); FX.SFX.crash(); } return; }
+            if (r.stun <= 0) for (const o of allObs) {
+              if (o.z > r.z + 2) break;
+              if (!(z0 < o.z + o.len && r.z > o.z - 0.25)) continue; if (!o.lanes.includes(Math.round(1 - r.x / LANE))) continue;
+              const feet = r.y - o.h;
+              if (o.type === "vent" && feet < o.top - 0.05) { stumble(r, r.me && "つまずいた！ ジャンプで飛びこえよう"); break; }
+              else if (o.type === "ac" && feet < o.top - 0.05) { stumble(r, r.me && "ぶつかった！ ←→でよけよう"); r.z = o.z - 0.4; break; }
+              else if (o.type === "pipe" && r.slide <= 0 && feet < 1.3) { stumble(r, r.me && "ゴン！ ↓でスライディング"); break; }
+            }
+            if (!r.fin && r.z >= GOAL) { r.fin = tAll + 0.0001 * r.i; finishOrder.push(r); if (r.me) { place = finishOrder.length; phase = "over"; tEnd = 0; ctx.big(place === 1 ? "1位でゴール！" : place + "位でゴール", 1.8, place === 1 ? "#ffe066" : "#fff"); if (place === 1) { S.cheer && S.cheer(); FX.SFX.finish(); } else FX.SFX.star(); } }
+            if (r.fin) r.v = Math.max(0, r.v - dt * 6);
+          });
+          // 見た目
+          runners.forEach((r) => {
+            const a = r.a; a.g.position.set(r.x, r.y, r.z); a.g.rotation.set(0, 0, 0); a.torso.rotation.x = 0;
+            r.ph += dt * r.v * 1.6;
+            if (r.fall > 0) { a.g.rotation.x = 0.6; runPose(a, t * 20, 1); }
+            else if (r.slide > 0 && r.ground) { runPose(a, 0, 0); a.g.rotation.x = -1.1; a.g.position.y = r.y + 0.25; a.armL.rotation.x = a.armR.rotation.x = -2.6; }
+            else if (!r.ground) { runPose(a, 1.2, 1); a.legL.rotation.x = -1.0; a.legR.rotation.x = 0.5; a.armL.rotation.x = -2.4; a.armR.rotation.x = -2.2; }
+            else if (r.stun > 0) { runPose(a, 0, 0); a.torso.rotation.x = 0.5; }
+            else { runPose(a, r.ph, Math.min(1, r.v / 6)); a.torso.rotation.x = Math.min(0.35, r.v * 0.04); }
+          });
+          camera.position.lerp(new T.Vector3(P.x * 0.6, P.y + 3.3, P.z - 6.2), Math.min(1, dt * 6)); camL.lerp(new T.Vector3(P.x * 0.5, P.y + 0.9, P.z + 9), Math.min(1, dt * 6)); camera.lookAt(camL);
+          if ((t * 5 | 0) !== ((t - dt) * 5 | 0)) hud();
+          if (phase === "over") {
+            tEnd += dt;
+            if (tEnd > 2.2) { phase = "end"; const win = place === 1;
+              ctx.end({ win, title: win ? "1位！ " + tAll.toFixed(1) + "秒" : place + "位 " + tAll.toFixed(1) + "秒", text: "ビルの屋上 " + GOAL + "m を走りぬけた", metric: { v: Math.round(tAll * 10) / 10, unit: "秒", lower: true, label: "タイム" } }); }
+          }
+        }
+      };
+    }
+  });
+
+  // =====================================================================
   // スターストライカー：宇宙を飛ぶ3Dシューティング。さいごのボスをたおせば勝ち
   // =====================================================================
   HM3D.register({
