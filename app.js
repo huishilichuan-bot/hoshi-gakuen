@@ -1,7 +1,7 @@
 /* ほしの学園 — 勉強して⭐を集める学習アプリ（小1〜中3）。課金・お金の機能はありません。 */
 (() => {
   "use strict";
-  const VERSION = "1.7.0";
+  const VERSION = "1.7.1";
   // 記録はプロフィールごとに分けて保存：ゲスト＝"hoshigakuen"、アカウント＝"hoshigakuen:u:<uid>"（ログアウトで消す）
   const GUEST_KEY = "hoshigakuen";
   let KEY = GUEST_KEY;
@@ -2185,6 +2185,7 @@
     if (!gamesOpen()) { toast("🔒 今日の⭐をあと " + (STARS_TO_UNLOCK - starsToday()) + " こ集めるとひらくよ"); return; }
     closeModeSel(true);
     let playId = pack.group ? pack.members[0].id : pack.id;
+    let lapsPick = 2;
     const paint = () => {
       const g = pack.group ? pack.members.find((x) => x.id === playId) || pack.members[0] : pack;
       playId = g.id;
@@ -2195,6 +2196,10 @@
       if (pack.group) {
         courses = '<div class="ms-courses">' + pack.members.map((m) => '<button type="button" class="ms-course' + (m.id === playId ? " on" : "") + '" data-course="' + m.id + '">' + (m.e || "") + " " + esc(m.n) + "</button>").join("") + "</div>";
       }
+      if (playId === "kart") {
+        courses += '<div class="ms-courses ms-laps"><span class="ms-lab">周回</span>' +
+          [2, 3].map((n) => '<button type="button" class="ms-course' + (lapsPick === n ? " on" : "") + '" data-laps="' + n + '">' + n + "周</button>").join("") + "</div>";
+      }
       el.querySelector(".ms-panel").innerHTML = '<h2 class="ms-title">モード選択</h2><div class="ms-game"><span>' + HMIcons.icon(g.id, g.c, 28, g.e) + esc(pack.group ? pack.n + " ／ " + g.n : g.n) + "</span></div>" + courses + btns;
     };
     const el = document.createElement("div"); el.id = "mode-sel"; el.className = "mode-sel"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", pack.n + " モード選択");
@@ -2203,7 +2208,8 @@
     paint();
     el.addEventListener("click", (e) => {
       const c = e.target.closest("[data-course]"); if (c) { sound("tap"); playId = c.dataset.course; paint(); return; }
-      const b = e.target.closest("[data-diff]"); if (b) { sound("tap"); closeModeSel(true); startGame(playId, b.dataset.diff); return; }
+      const lp = e.target.closest("[data-laps]"); if (lp) { sound("tap"); lapsPick = +lp.dataset.laps === 3 ? 3 : 2; if (window.HMRace3d) HMRace3d.pendingLaps = lapsPick; paint(); return; }
+      const b = e.target.closest("[data-diff]"); if (b) { sound("tap"); if (playId === "kart" && window.HMRace3d) HMRace3d.pendingLaps = lapsPick; closeModeSel(true); startGame(playId, b.dataset.diff); return; }
       if (e.target.closest('[data-ms="top"]') || e.target === el) { sound("tap"); closeModeSel(); }
     });
   }
