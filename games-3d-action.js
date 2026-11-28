@@ -19,6 +19,164 @@
   }
 
   // =====================================================================
+  // 雪合戦ロイヤル：6人で雪玉を投げ合い、さいごまで残った人の勝ち
+  // =====================================================================
+  HM3D.register({
+    id: "snowfight", e: "☃️", n: "雪合戦ロイヤル", c: "#74c0fc", genre: "battle", title: "雪合戦ロイヤル",
+    d: "3Dの雪の広場で6人の雪合戦！←↑↓→で動いて、「投げる」で近くの相手に雪玉。「かがむ」で雪の山にかくれよう。3回当たると退場。ふぶきがせまってくるよ。さいごまで残れば勝ち。",
+    help: "←↑↓→ で動く（画面の右が右）<br>「投げる」（スペース）：前にいる相手へ<br>「かがむ」（X）：雪の山のかげで当たりにくい",
+    arrows: "cross", buttons: [{ k: "a", label: "投げる", cls: "go big" }, { k: "b", label: "かがむ", cls: "" }],
+    sky: 0xcfe3f5, fogCol: 0xe7f1fb, fogNear: 40, fogFar: 110, far: 200, fov: 55,
+    setup(ctx) {
+      const { T, scene, camera, inp, S, FX } = ctx;
+      const D = ctx.diff, sk = ctx.sk, me = partnerColor(T, 0xe03131);
+      const AR = 28, BR = 0.17, g = 14;
+      // ---- 広場 ----
+      const snowM = new T.MeshLambertMaterial({ emissive: 0x8796a8, map: (() => { const t = noiseTex(T, "#f4f8fc", ["#e9f1f9", "#ffffff", "#dde9f5"], 2); t.repeat.set(16, 16); return t; })() });
+      flat(T, scene, 400, 400, snowM, 0, 0, 0);
+      const rr = R01(31), trees = [], snowTops = [], rocks = [];
+      for (let i = 0; i < 90; i++) { const a = rr() * Math.PI * 2, d = AR + 3 + rr() * 45; trees.push({ x: Math.cos(a) * d, y: 3.2, z: Math.sin(a) * d, s: 0.8 + rr() * 0.8 }); snowTops.push({ x: Math.cos(a) * d, y: 5.2 * (0.8 + rr() * 0) + 0.5, z: Math.sin(a) * d, s: 0.8 }); }
+      inst(T, scene, new T.ConeGeometry(2.2, 6.5, 7), lam(T, 0x2b6a4a), trees);
+      inst(T, scene, new T.ConeGeometry(1.1, 2.0, 7), lam(T, 0xf8fbff), snowTops);
+      // 雪の山（かくれる場所）
+      const mounds = [];
+      const moundM = new T.MeshLambertMaterial({ color: 0xffffff, emissive: 0x7f8fa3 });
+      const mk = (x, z, r, h) => { const m = new T.Mesh(G(T, "mound", () => new T.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2)), moundM); m.scale.set(r, h, r); m.position.set(x, 0, z); scene.add(m); mounds.push({ x, z, r, h }); };
+      for (let i = 0; i < 11; i++) { const a = (i / 11) * Math.PI * 2 + rr() * 0.4, d = 6 + rr() * 17; mk(Math.cos(a) * d, Math.sin(a) * d, 1.5 + rr() * 1.0, 1.25 + rr() * 0.35); }
+      mk(0, 0, 2.2, 1.4);
+      // 雪だるま（かざり）
+      [[-AR + 3, 6], [AR - 4, -8], [5, AR - 4]].forEach(([x, z]) => { sph(T, scene, 0.9, 0xffffff, x, 0.8, z); sph(T, scene, 0.6, 0xffffff, x, 2.0, z); cone(T, scene, 0.1, 0.4, 6, 0xff922b, x, 2.05, z - 0.65).rotation.x = -Math.PI / 2; box(T, scene, 0.7, 0.5, 0.7, 0x212529, x, 2.75, z); });
+      // ふぶきの輪
+      const stormM = new T.MeshBasicMaterial({ color: 0xa5d8ff, transparent: true, opacity: 0.28, side: T.DoubleSide, depthWrite: false });
+      const storm = new T.Mesh(new T.CylinderGeometry(1, 1, 6, 48, 1, true), stormM); storm.position.y = 3; scene.add(storm);
+      // ---- 子どもたち ----
+      const cols = [me, 0x1c7ed6, 0x2f9e44, 0xf08c00, 0x9c36b5, 0x0b7285];
+      const names = ["あなた", "そら", "みどり", "だいち", "すみれ", "うみ"];
+      const kids = cols.map((c, i) => {
+        const a = athlete(T, scene, { shirt: c, pants: 0x343a40, cap: i === 0 ? 0xffffff : 0xf1f3f5, stripe: 0xffffff, glove: c, shoe: 0x495057, sock: 0x495057, noBake: true }); bakeTree(T, a.g);
+        const ang = (i / 6) * Math.PI * 2 + 0.3, x = Math.cos(ang) * 18, z = Math.sin(ang) * 18;
+        const tag = new T.Mesh(new T.PlaneGeometry(2.4, 0.6), new T.MeshBasicMaterial({ map: textTex(T, names[i], { w: 256, h: 64, bg: i ? "rgba(0,0,0,0.45)" : "#e03131", fg: "#fff", fs: 44 }), transparent: true, depthTest: false })); tag.renderOrder = 6; scene.add(tag);
+        return { a, i, me: i === 0, x, z, face: Math.atan2(-x, -z), hp: i === 0 ? ({ easy: 5, normal: 3, hard: 3, ultra: 2 }[D] || 3) : 3, out: false, cd: 1 + rr() * 1.5, crouch: false, vx: 0, vz: 0, wp: { x, z }, tgt: null, cTime: 0, hitT: 0, tag, think: rr() * 1, outT: 0, cold: 0 };
+      });
+      const P = kids[0];
+      const hearts = P.hp;
+      const CPUCD = { easy: 2.0, normal: 1.45, hard: 1.1, ultra: 0.9 }[D] || 1.45, CPUERR = { easy: 1.6, normal: 1.05, hard: 0.7, ultra: 0.45 }[D] || 1.05;
+      // ---- 雪玉 ----
+      const balls = [], ballGeo = new T.SphereGeometry(BR, 8, 6), ballM = lam(T, 0xffffff);
+      function blockedBy(x, z, y) { for (const m of mounds) { const d = Math.hypot(x - m.x, z - m.z); if (d < m.r) { const hh = m.h * Math.sqrt(Math.max(0, 1 - (d / m.r) ** 2)); if (y < hh) return true; } } return false; }
+      function throwAt(k, tx, tz) {
+        const sx = k.x + Math.sin(k.face) * 0.5, sz = k.z + Math.cos(k.face) * 0.5, sy = 1.6;
+        const d = Math.hypot(tx - sx, tz - sz), tt = clamp(d / 17, 0.25, 1.4), ty = 1.0;
+        const vx = (tx - sx) / tt, vz = (tz - sz) / tt, vy = (ty - sy + 0.5 * g * tt * tt) / tt;
+        const m = new T.Mesh(ballGeo, ballM); m.position.set(sx, sy, sz); scene.add(m);
+        balls.push({ m, x: sx, y: sy, z: sz, vx, vy, vz, owner: k, age: 0 });
+        k.throwT = 0.35; if (k.me) S.throwS ? S.throwS() : FX.SFX.whoosh();
+      }
+      function nearestFoe(k, cone) {
+        let best = null, bd = 1e9;
+        kids.forEach((o) => { if (o === k || o.out) return; const dx = o.x - k.x, dz = o.z - k.z, d = Math.hypot(dx, dz); if (d > 24) return; if (cone) { let da = Math.atan2(dx, dz) - k.face; da = Math.atan2(Math.sin(da), Math.cos(da)); if (Math.abs(da) > cone) return; } const sc = d + (cone ? Math.abs(Math.atan2(Math.sin(Math.atan2(dx, dz) - k.face), Math.cos(Math.atan2(dx, dz) - k.face))) * 6 : 0); if (sc < bd) { bd = sc; best = o; } });
+        return best;
+      }
+      function hitKid(k, by) {
+        if (phase !== "play" || k.out) return;
+        k.hp--; k.hitT = 0.4; ctx.fx3.burst(new T.Vector3(k.x, 1.2, k.z), [0xffffff, 0xe7f5ff], 14, 2.5, 0.4);
+        if (by && by.me) { hits++; ctx.big(k.hp > 0 ? "あたり！" : names[k.i] + " 退場！", 0.8, "#69db7c"); FX.SFX.star(); }
+        if (k.me) { ctx.shake.add(0.35); ctx.overlay.flash("#e7f5ff", 0.35); FX.SFX.hit(); ctx.say(k.hp > 0 ? "当たった！ のこり ❤" + k.hp : "当たっちゃった…", 1.2); }
+        if (k.hp <= 0) { k.out = true; k.outT = 0; place = kids.filter((o) => !o.out).length + 1; if (k.me) myPlace = place; }
+        hud();
+      }
+      // ---- 状態 ----
+      let tAll = 0, hits = 0, phase = "play", tEnd = 0, place = 6, myPlace = 0, stormR = AR + 2;
+      const camL = new T.Vector3(P.x, 0, P.z);
+      function hud() { const alive = kids.filter((k) => !k.out).length; ctx.hud({ big: "のこり " + alive + "人", sub: "❤".repeat(Math.max(0, P.hp)) + "♡".repeat(Math.max(0, hearts - P.hp)), sub2: "あてた " + hits + "回" + (tAll > 25 ? "・ふぶきがせまる！" : ""), right: Math.floor(tAll) + "秒" }); }
+      hud();
+      return {
+        dbg: () => ({ phase, x: P.x, z: P.z, face: P.face, hp: P.hp, hits, alive: kids.filter((k) => !k.out).length, foes: kids.filter((k) => !k.me && !k.out).map((k) => ({ x: k.x, z: k.z })), stormR }),
+        step(dt, t) {
+          const go = ctx.st.go && phase === "play"; if (go) tAll += dt;
+          // ふぶき：30秒から小さくなる
+          if (go && tAll > 30) stormR = Math.max(7, stormR - dt * 0.35);
+          storm.scale.set(stormR, 1, stormR); storm.rotation.y += dt * 0.2; stormM.opacity = tAll > 25 ? 0.28 + Math.sin(t * 3) * 0.06 : 0.12;
+          // プレイヤー
+          if (go && !P.out) {
+            P.crouch = !!inp.held.b;
+            const mx = -inp.x(), mz = inp.y(), sp = P.crouch ? 1.2 : 5.6 * (P.cold > 0 ? 0.6 : 1);
+            P.vx = lerp(P.vx, mx * sp, Math.min(1, dt * 10)); P.vz = lerp(P.vz, mz * sp, Math.min(1, dt * 10));
+            if (mx || mz) { const tf = Math.atan2(mx, mz); P.face += Math.atan2(Math.sin(tf - P.face), Math.cos(tf - P.face)) * Math.min(1, dt * 10); }
+            P.cd -= dt;
+            if (inp.hit("a") && P.cd <= 0 && !P.crouch) { const f = nearestFoe(P, 1.0); if (f) { P.face = Math.atan2(f.x - P.x, f.z - P.z); const lead = Math.hypot(f.x - P.x, f.z - P.z) / 17; throwAt(P, f.x + f.vx * lead * 0.8, f.z + f.vz * lead * 0.8); } else throwAt(P, P.x + Math.sin(P.face) * 14, P.z + Math.cos(P.face) * 14); P.cd = 0.5; }
+          } else { inp.hit("a"); }
+          // CPU
+          kids.forEach((k) => {
+            if (k.me || k.out || !go) return;
+            k.think -= dt; k.cd -= dt;
+            if (k.think <= 0) {
+              k.think = rnd(0.6, 1.4); k.tgt = nearestFoe(k, 0) || null;
+              const tg = k.tgt; let wx = k.x, wz = k.z;
+              if (tg) { const dx = tg.x - k.x, dz = tg.z - k.z, d = Math.hypot(dx, dz) || 1, want = rnd(8, 13); const side = rnd(-1, 1) * 5; wx = tg.x - (dx / d) * want + (-dz / d) * side; wz = tg.z - (dz / d) * want + (dx / d) * side; }
+              // たまに近くの雪山へ
+              if (Math.random() < 0.3) { let bm = null, bd = 1e9; mounds.forEach((m) => { const d = Math.hypot(m.x - k.x, m.z - k.z); if (d < bd) { bd = d; bm = m; } }); if (bm && tg) { const dx = bm.x - tg.x, dz = bm.z - tg.z, d = Math.hypot(dx, dz) || 1; wx = bm.x + (dx / d) * (bm.r + 0.7); wz = bm.z + (dz / d) * (bm.r + 0.7); } }
+              const rd = Math.hypot(wx, wz); if (rd > stormR - 2) { wx *= (stormR - 3) / rd; wz *= (stormR - 3) / rd; }
+              k.wp = { x: wx, z: wz }; k.crouch = Math.random() < 0.18;
+            }
+            const dx = k.wp.x - k.x, dz = k.wp.z - k.z, d = Math.hypot(dx, dz), sp = k.crouch ? 0 : 4.6 * (0.85 + sk * 0.15) * (k.cold > 0 ? 0.6 : 1);
+            if (d > 0.5) { k.vx = lerp(k.vx, (dx / d) * sp, Math.min(1, dt * 6)); k.vz = lerp(k.vz, (dz / d) * sp, Math.min(1, dt * 6)); } else { k.vx *= 0.8; k.vz *= 0.8; }
+            const tg = k.tgt && !k.tgt.out ? k.tgt : null;
+            if (tg) { const fa = Math.atan2(tg.x - k.x, tg.z - k.z); k.face += Math.atan2(Math.sin(fa - k.face), Math.cos(fa - k.face)) * Math.min(1, dt * 6); }
+            else if (d > 0.5) k.face = Math.atan2(dx, dz);
+            if (tg && k.cd <= 0) { const dd = Math.hypot(tg.x - k.x, tg.z - k.z); if (dd < 20) { k.crouch = false; const lead = dd / 17 * rnd(0.3, 1.0); throwAt(k, tg.x + tg.vx * lead + rnd(-1, 1) * CPUERR, tg.z + tg.vz * lead + rnd(-1, 1) * CPUERR); k.cd = CPUCD * rnd(0.8, 1.3) * (tg.me ? 1 : 1.25); } }
+          });
+          // 移動と衝突
+          kids.forEach((k) => {
+            if (k.out) return;
+            k.x += k.vx * dt; k.z += k.vz * dt;
+            mounds.forEach((m) => { const dx = k.x - m.x, dz = k.z - m.z, d = Math.hypot(dx, dz), md = m.r + 0.35; if (d < md && d > 1e-4) { k.x = m.x + (dx / d) * md; k.z = m.z + (dz / d) * md; } });
+            const r = Math.hypot(k.x, k.z); if (r > AR) { k.x *= AR / r; k.z *= AR / r; }
+            // ふぶきの外はさむい
+            if (go && !k.out && r > stormR) { k.cold += dt; if (k.cold > 2.5) { k.cold = 0.01; hitKid(k, null); if (k.me) ctx.say("さむい！ ふぶきの中へもどろう", 1.4); } } else k.cold = 0;
+          });
+          for (let i = 0; i < kids.length; i++) for (let j = i + 1; j < kids.length; j++) { const a = kids[i], b = kids[j]; if (a.out || b.out) continue; const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz); if (d < 0.8 && d > 1e-4) { const p = (0.8 - d) / 2; a.x -= dx / d * p; a.z -= dz / d * p; b.x += dx / d * p; b.z += dz / d * p; } }
+          // 雪玉
+          for (let i = balls.length - 1; i >= 0; i--) {
+            const b = balls[i]; b.age += dt; let gone = false;
+            for (let s2 = 0; s2 < 3 && !gone; s2++) {
+              const h = dt / 3; b.vy -= g * h; b.x += b.vx * h; b.y += b.vy * h; b.z += b.vz * h;
+              if (b.y < 0.1 || blockedBy(b.x, b.z, b.y)) { gone = true; ctx.fx3.burst(new T.Vector3(b.x, Math.max(0.1, b.y), b.z), [0xffffff], 8, 1.6, 0.3); break; }
+              for (const k of kids) { if (k.out || k === b.owner) continue; const top = k.crouch ? 0.95 : 1.75; if (Math.hypot(k.x - b.x, k.z - b.z) < 0.45 && b.y < top && b.y > 0.1) { gone = true; hitKid(k, b.owner); break; } }
+            }
+            if (b.age > 3) gone = true;
+            if (gone) { scene.remove(b.m); balls.splice(i, 1); } else b.m.position.set(b.x, b.y, b.z);
+          }
+          // 見た目
+          kids.forEach((k) => {
+            const a = k.a, spd = Math.hypot(k.vx, k.vz);
+            a.g.position.set(k.x, 0, k.z); a.g.rotation.y = k.face;
+            if (k.out) { k.outT += dt; a.g.position.y = 0; a.hip.position.y = 0.45; a.legL.rotation.x = a.legR.rotation.x = -1.4; a.armR.rotation.set(-2.6, 0, Math.sin(t * 6) * 0.4); a.g.visible = k.outT < 4; k.tag.visible = false; return; }
+            runPose(a, t * 11, Math.min(1, spd / 4.5));
+            if (k.crouch) { a.hip.position.y = 0.55; a.legL.rotation.x = a.legR.rotation.x = -1.2; a.legL.userData.knee.rotation.x = a.legR.userData.knee.rotation.x = 2.0; }
+            if (k.throwT > 0) { k.throwT -= dt; a.armR.rotation.x = -2.6 + (0.35 - k.throwT) * 8; }
+            if (k.hitT > 0) { k.hitT -= dt; a.torso.rotation.x = -0.3; } else a.torso.rotation.x = 0;
+            k.tag.position.set(k.x, 2.35, k.z); k.tag.quaternion.copy(camera.quaternion);
+          });
+          // カメラ
+          camera.position.lerp(new T.Vector3(P.x, 10.5, P.z - 9.5), Math.min(1, dt * 4)); camL.lerp(new T.Vector3(P.x, 0, P.z + 3), Math.min(1, dt * 4)); camera.lookAt(camL);
+          // 勝ち負け
+          if (phase === "play") {
+            const alive = kids.filter((k) => !k.out);
+            if (P.out) { phase = "over"; tEnd = 0; ctx.big("退場… " + myPlace + "位", 1.8, "#ff8787"); }
+            else if (alive.length === 1) { phase = "over"; tEnd = 0; myPlace = 1; ctx.big("さいごまで残った！", 1.8, "#ffe066"); S.cheer && S.cheer(); FX.SFX.finish(); }
+            if ((t * 4 | 0) !== ((t - dt) * 4 | 0)) hud();
+          } else if (phase === "over") {
+            tEnd += dt;
+            if (tEnd > 2) { phase = "end"; const win = myPlace === 1;
+              ctx.end({ win, title: win ? "優勝！ 1位" : myPlace + "位", text: "あてた " + hits + "回・" + Math.round(tAll) + "秒", metric: { v: myPlace, unit: "位", lower: true, label: "順位" } }); }
+          }
+        }
+      };
+    }
+  });
+
+  // =====================================================================
   // タンクバトル：かべではね返る砲弾で、3台の敵戦車をたおす
   // =====================================================================
   HM3D.register({
